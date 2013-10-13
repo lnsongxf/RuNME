@@ -21,6 +21,26 @@ int add(double** matrixA, double** matrixB, int rows, int cols, double*** sum){
   return 0;
 }
 
+int subtract(double** matrixA, double** matrixB, int rows, int cols, double*** diff){
+  
+  // Create diff matrix
+  
+  *diff = calloc(rows, sizeof(double*));
+  for (int i = 0; i < rows; i++){
+    (*diff)[i] = (double*) calloc(cols, sizeof(double));
+  }
+  
+
+  // Assign entries of matrix
+  for (int i = 0; i < rows; i++){
+    for (int j = 0; j < cols; j++){
+      (*diff)[i][j] = matrixA[i][j] - matrixB[i][j];
+    }
+  }
+
+  return 0;
+}
+
 int multiply(double** matrixA, double** matrixB, int rowsA, int colsA, int rowsB, int colsB, double*** prod){
   
   // Check if valid multiplication
@@ -28,7 +48,6 @@ int multiply(double** matrixA, double** matrixB, int rowsA, int colsA, int rowsB
     return 1;
 
   // Create product matrix
-
   *prod = calloc(rowsA, sizeof(double*));
   for (int i = 0; i < rowsA; i++){
     (*prod)[i] = (double*) calloc(colsB, sizeof(double));
@@ -121,7 +140,7 @@ int print(int n, int m, double** matrix){
 
   return 0;
 }
-
+/*
 int main(){
   int n = 2;
   int m = 2;
@@ -144,3 +163,4 @@ int main(){
 
   print(2,2,z);
 }
+*/
