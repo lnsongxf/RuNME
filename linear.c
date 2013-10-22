@@ -8,8 +8,7 @@
 
 #include "matrix.h"
 
-void LUIterate(double* A, int n, int curr, double** L, double** A2){
-
+void LUIterate(double* A, int n, int k, double** L, double** A2){
   // A[k+1] = (I - L) A[k]
 
   // Create identity matrix
@@ -21,11 +20,10 @@ void LUIterate(double* A, int n, int curr, double** L, double** A2){
 
   zeros(n, n, &Ltemp);
   zeros(n, n, &A2temp);
-  //zeros(n, n, L);
   
   // Set up L matrix
-  for (int i = 0; i < n; i++){
-    Ltemp[i*n + curr] = A[i*n + curr] / A[curr*n + curr];
+  for (int i = k + 1; i < n; i++){
+    Ltemp[i*n + k] = A[i*n + k] / A[k*n + k];
   }
 
   printf("L\n");
@@ -41,8 +39,12 @@ void LUIterate(double* A, int n, int curr, double** L, double** A2){
   // A2 = (I - L) * A
   mult(diff, A, n, n, n, n, &A2temp);
 
-  L = &Ltemp;
-  A2 = &A2temp;
+  // Copy the temp matrices into output matrices
+  printf("now copying\n");
+  copy(diff, L, n, n);
+  printf("...");
+  copy(A2temp, A2, n, n);
+  printf("copying done\n");
 
   printf("A\n");
   print(A,2,2);
@@ -55,8 +57,55 @@ void LUIterate(double* A, int n, int curr, double** L, double** A2){
 
 }
 
-void LUDecomposition(double** matrix, int rows, int cols){
+void LUDecomposition(double* matrix, int n, double** Lout, double** Uout){
+  // for each column
+
+  double* Lprod;
+  double* Ltemp;
+
+  double* Lprodnew;
+
+  double* A;
+  double* A2;
+
+  zeros(n, n, &Ltemp);
+  zeros(n, n, &Lprod);
+  zeros(n, n, &A);
+  zeros(n, n, &A2);
+  zeros(n, n, &Lprodnew);
   
+  for (int j = 0; j < n - 1; j++){
+
+    if (j == 0){
+      printf("LU %d start\n", j);
+      LUIterate(matrix, n, 0, &Ltemp, &A2);
+      printf("LU %d done\n", j);
+
+      copy(Ltemp, &Lprod, n, n);
+      printf("Copy L %d done\n", j);
+    }
+    else{
+      printf("LU %d start\n", j);
+      LUIterate(A, n, j, &Ltemp, &A2);
+      printf("LU %d done\n", j);
+
+      mult(Lprod, Ltemp, n, n, n, n, &Lprodnew);
+      printf("Mult done\n");
+      copy(Lprodnew, &Lprod, n, n);
+      printf("Copy L %d done\n", j);
+    }
+
+    // Update A
+    copy(A2, &A, n, n);
+    printf("Copy A %d done\n", j);
+    printf("====================\n");
+
+  }
+
+  // Copy out
+  copy(A, Uout, n, n);
+  copy(Lprod, Lout, n, n);
+
 }
 
 int main(){
@@ -72,12 +121,18 @@ int main(){
 
   //LUDecomposition(mat, 2, 2);
 
-  double** L;
-  double* A2;
+  double* L;
+  double* U;
+
+  zeros(2,2,&L);
+  zeros(2,2,&U);
 
   print(mat,2,2);
 
-  LUIterate(mat, 2, 0, L, &A2);
-  
-  printf(">>>\t%f\n",);
+  //LUIterate(mat, 2, 0, &L, &A2);
+
+  LUDecomposition(mat, 2, &L, &U);
+
+  print(L,2,2);
+  print(U,2,2);
 }
