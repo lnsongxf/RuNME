@@ -1,6 +1,16 @@
 #include<stdio.h>
 #include<stdlib.h>
 
+int copy(double* A, double** B, int rows, int cols){
+  for (int i = 0; i < rows; i++){
+    for (int j = 0; j < cols; j++){
+      (*B)[i*cols + j] = A[i*cols + j];
+    }
+  }
+
+  return 0;
+}
+
 int add(double* A, double* B, int rows, int cols, double** sum){
   *sum = calloc(rows * cols, sizeof(double));
 
