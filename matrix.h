@@ -8,5 +8,6 @@ int mult(double* matrixA, double* matrixB, int rowsA, int colsA, int rowsB, int 
 int ones(int n, int m, double** one);
 int zeros(int n, int m, double** zero);
 int eye(int n, double** id);
+int rands(int n, int m, double** random);
 
 int print(double* matrix, int n, int m);

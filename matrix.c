@@ -1,5 +1,6 @@
 #include<stdio.h>
 #include<stdlib.h>
+#include<time.h>
 
 int copy(double* A, double** B, int rows, int cols){
   for (int i = 0; i < rows; i++){
@@ -102,6 +103,19 @@ int eye(int n, double** id){
       else{
 	(*id)[i*n + j] = 0;
       }
+    }
+  }
+
+  return 0;
+}
+
+int rands(int n, int m, double** random){
+  *random = calloc(n*m, sizeof(double));
+  srand((unsigned)time(0));
+
+  for (int i = 0; i < n; i++){
+    for (int j = 0; j < m; j++){
+      (*random)[i*n + j] = (float) rand() / (float) RAND_MAX;
     }
   }
 
