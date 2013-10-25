@@ -163,8 +163,46 @@ void LUDecomposition(double* matrix, int n, double** Lout, double** Uout){
 
 }
 
+void CholeskyDecomposition(double* A, int n, double** L){
+
+}
+
+void GaussJacobiIteration(double* A, double* b, double* x, int n, double** x2){
+
+  double* x2temp;
+  zeros(n, 1, &x2temp);
+  double sum;
+
+  // Gauss-Jacobi Iteration Formula
+  // x^{k+1}_{j} = (1/A_{j,j}) (b_j - \sum_{i \neq j} (A_{j,i} * x_i))
+
+  for (int i = 0; i < n; i++){
+    sum = 0;
+
+    for (int j = 0; j < n; j++){
+
+      if (i != j){
+	printf("[%f][%f]\n", A[i*n + j], x[j]);
+	sum += A[i*n + j] * x[j];
+      }
+    }
+
+    printf("%f\n", sum);
+
+    x2temp[i] = (b[i] - sum) / A[i*n + i];
+  }
+
+  copy(x2temp, x2, n, n);
+}
+
+/*
+*
+* Test Cases
+*
+*/
+
 void testLU(){
-    double *mat;
+  double *mat;
 
   zeros(2,2,&mat);
 
@@ -179,11 +217,7 @@ void testLU(){
   b[0] = 1;
   b[1] = 2;
 
-  double* L;
-  double* U;
-
-  double* z;
-  double* x;
+  double* L, *U, *z, *x;
 
   zeros(2,2,&L);
   zeros(2,2,&U);
@@ -211,10 +245,67 @@ void testLU(){
 
   printf("x\n");
   print(x,2,1);
+
+  // Ax
+  double* bstar;
+  zeros(2,1,&bstar);
+
+  mult(mat,x,2,2,2,1,&bstar);
+  print(bstar,2,1);
 }
+
+void testGJ(){
+  double *mat;
+
+  zeros(2,2,&mat);
+
+  mat[0] = 1;
+  mat[1] = 2;
+  mat[1*2] = 3;
+  mat[1*2+1] = 4;
+
+  double* b;
+  zeros(2,1,&b);
+
+  b[0] = 1;
+  b[1] = 2;
+
+  double* x0;
+  zeros(2,1,&x0);
+
+  double* x;
+  zeros(2,1,&x);
+
+  double* xtemp;
+  zeros(2,1,&xtemp);
+
+  printf("A\n");
+  print(mat,2,2);
+
+  printf("B\n");
+  print(b,2,1);
+
+  printf("x0\n");
+  print(x0,2,1);
+
+  int iters = 5;
+
+  for (int i = 0; i < iters; i++){
+    if (i == 0){
+      GaussJacobiIteration(mat, b, x0, 2, &x);
+    }
+    else{
+      GaussJacobiIteration(mat, b, x, 2, &xtemp);
+      copy(xtemp,&x,2,1);
+    }
+    printf("Iteration %d:\n", i);
+    print(x,2,1);
+  }
+}
+
 
 int main(){
   testLU();
-
+  //testGJ();
 
 }
