@@ -68,6 +68,17 @@ int mult(double* A, double* B, int rowsA, int colsA, int rowsB, int colsB, doubl
   return 0;
 }
 
+int equal(double* A, double* B, int n, int m){
+  for (int i = 0; i < n; i++){
+    for (int j = 0; j < m; j++){
+      if (A[i*m+j] != B[i*m+j])
+	return 0;
+    }
+  }
+
+  return 1;
+}
+
 int ones(int n, int m, double** one){
   *one = calloc(n*m, sizeof(double));
 
