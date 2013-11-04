@@ -1,7 +1,7 @@
 # External Libraries
 import numpy
 
-def cournotEqmSelection(cost, demand):
+def cournotEqmSelection(cost, demand, iters=100, verbose=False):
     """
     ** Compute equilibrium to game with n players,
     ** stable under DAgMirN criterion (Gauss-Jacobi iteration)
@@ -12,6 +12,7 @@ def cournotEqmSelection(cost, demand):
     * cost - nx1 array of slope of each player's marginal cost
     * demand - 1x2 array of demand function parameters
     *        - qty(price) = demand[0] - demand[1] * price
+    * iters  - maximum number of iterations
 
     ** Output
 
@@ -22,6 +23,12 @@ def cournotEqmSelection(cost, demand):
     # 0. Number of Players
     N = len(cost)
     print N, "players"
+
+    print "Marginal Cost"
+    print cost
+    
+    print "Demand Parameters"
+    print demand
 
     # 1. Set up initial guess (qty=0 for all players)
     qty = numpy.zeros([N,1])
@@ -35,39 +42,66 @@ def cournotEqmSelection(cost, demand):
     # A_ij = 1
     # b_i = d_0
 
-    # 3. Run Gauss-Jacobi (Just iterations now)
+    # 3. Run Gauss-Jacobi
+
+    print "\nBeginning Gauss-Jacobi Iterations"
+    print "================================="
+
     converge = numpy.zeros([N,1])
-    iters = 100
+    converged = False
+
     for i in xrange(100):
 
         for n in xrange(N):
+            # Best Response Function of Firm N
+            # given that every other firm m produces qty[m]
             qtyN = (demand[0] - numpy.sum(qty) + qty[n]) / (2 + cost[n] * demand[1])
-            print qtyN
+
+            if verbose:
+                print qtyN
+
             converge[n] = qtyN == qty[n]
             qty[n] = qtyN
             
         # Check if converged
         if sum(converge) == N:
-            print "DONE"
-            iter = i
+            print "Converged after", i, "iterations"
+            print "=================================\n"
+
+            converged = True
             break
     
+    if converged == False:
+        print "Stopped after", iters, "iterations"
+        print "=================================\n"
+
+    # 4. Calculate Price and Display Results
     price = demand[0] - demand[1] * sum(qty)
 
-    print "Result after", i, "iterations"
+    print "Quantity"
     print qty
+
+    print "Price"
     print price
 
-    return qty
-
+    return (qty, price)
 
 def main():
 
-    cost = numpy.array([[1,3]]).T
+    #rcost = numpy.array([[1,3]]).T
 
-    demand = numpy.array([5,1])
+    #rdemand = numpy.array([0.5,0.5])
 
-    cournotEqmSelection(cost, demand)
+    # Set number of players
+    n = 2
+    
+    # Set max number of iterations
+    iters = 100
+
+    rcost = numpy.random.rand(n,1)
+    rdemand = numpy.random.rand(n,1)
+
+    cournotEqmSelection(rcost, rdemand, iters=iters)
 
     return 0
 
