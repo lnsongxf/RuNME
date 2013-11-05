@@ -14,7 +14,6 @@ def iterate(wage, wealth, p, p0, p1, alpha, gamma):
         nextpd.append((1, (1 - gamma) * wealth + (1 - alpha), p1))
 
     return nextpd
-    
 
 def wealthMovement(grid, prob, alpha, gamma, pi0, pi1):
 
@@ -28,19 +27,9 @@ def wealthMovement(grid, prob, alpha, gamma, pi0, pi1):
     for i in xrange(N):
         nxt = iterate(0, grid[i], prob[i,0], pi0, pi1, alpha, gamma)
 
-        #if prob[i,0] != 0:
-        #    print i
-        #    print nxt
-
-
         n1 = numpy.argmax(grid >= nxt[0][1]) - 1 # grid slot for w=0 entry
         n2 = numpy.argmax(grid >= nxt[1][1]) - 1 # grid slot for w=1 entry
 
-        #if prob[i,0] != 0:
-        #    print "P",prob[i,0]
-        #    print nxt[0][2]
-        #    print nxt[1][2]
-            
         newProb[n1,0] += prob[i,0] * nxt[0][2]
         newProb[n2,1] += prob[i,0] * nxt[1][2]
 
@@ -48,28 +37,15 @@ def wealthMovement(grid, prob, alpha, gamma, pi0, pi1):
     for i in xrange(N):
         nxt = iterate(1, grid[i], prob[i,1], pi0, pi1, alpha, gamma)
 
-        #if prob[i,1] != 0:
-        #    print i
-        #    print nxt
-
-
         n1 = numpy.argmax(grid >= nxt[0][1]) # grid slot for w=0 entry
         n2 = numpy.argmax(grid >= nxt[1][1]) # grid slot for w=1 entry
-        """
-        if prob[i,0] != 0:
-            print "P",prob[i,0]
-            print nxt[0][2]
-            print nxt[1][2]
-        """ 
+
         newProb[n1,0] += prob[i,1] * nxt[0][2]
         newProb[n2,1] += prob[i,1] * nxt[1][2]
 
-
-    #print "Newprob:\n", newProb
-
     return newProb
 
-def wealthDistribution(alpha, gamma, pi0, pi1, N):
+def wealthDistribution(alpha, gamma, pi0, pi1, N, iters=300):
     """
     ** Computes ergodic distribution
 
@@ -87,8 +63,8 @@ def wealthDistribution(alpha, gamma, pi0, pi1, N):
 
     ** Output
 
-    dist0 - vector of probabilities for w = 0
-    dist1 - vector of probabilities for w = 1
+    prob[:,0] - vector of probabilities for w = 0
+    prob[:,1] - vector of probabilities for w = 1
 
     """
 
@@ -102,9 +78,6 @@ def wealthDistribution(alpha, gamma, pi0, pi1, N):
     grid = numpy.linspace(0,amax,num=N)
     prob = numpy.zeros([N,2])
 
-
-
-
     # 3. Construct Markov Chain
 
     # Initial distribution: wage = 1, assets at 0
@@ -112,32 +85,45 @@ def wealthDistribution(alpha, gamma, pi0, pi1, N):
 
     #print grid
     #print prob
-    
-    for i in xrange(15):
+
+    for i in xrange(iters):
         prob = wealthMovement(grid, prob, alpha, gamma, pi0, pi1)
 
     #print prob
 
     # Plot W = 0
-    #ppt.plot(grid,prob[:,0])
+    ppt.plot(grid,prob[:,0])
+
 
     # Plot W = 1
-    #ppt.plot(grid,prob[:,1])
+    ppt.plot(grid,prob[:,1])
     #ppt.show()
+    ppt.savefig(str(alpha) + "_" + str(gamma) + "_" + str(pi0) + "_" + str(pi1) + "_" + str(N) + "_plot.png")
+    ppt.close()
 
     print "SUM: ", sum(prob)
     
-    return 0
+    return prob
 
 def main():
 
-    a = 0.1
-    g = 0.1
-    p0 = 0.5
-    p1 = 0.5
-    N = 10000
+    a_ = [0.1,0.5,0.9]
+    g_ = [0.1,0.5,0.9]
+    p0_ = [0.1,0.5,0.9]
+    p1_ = [0.1,0.5,0.9]
+    N_ = [100,500,1000]#,5000,10000]
 
-    wealthDistribution(a,g,p0,p1,N)
+    for a in a_:
+        for g in g_:
+            for p0 in p0_:
+                for p1 in p1_:
+                    for N in N_:
+
+                        print [a,g,p0,p1,N]
+                        try:
+                            wealthDistribution(a,g,p0,p1,N)
+                        except:
+                            continue
 
     return 0
 

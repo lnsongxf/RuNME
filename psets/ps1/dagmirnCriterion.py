@@ -1,7 +1,9 @@
 # External Libraries
 import numpy
+import time
+import math
 
-def cournotEqmSelection(cost, demand, iters=100, verbose=False):
+def cournotEqmSelection(cost, demand, iters=100, tol=1e-10, algo="gj"):
     """
     ** Compute equilibrium to game with n players,
     ** stable under DAgMirN criterion (Gauss-Jacobi iteration)
@@ -31,7 +33,8 @@ def cournotEqmSelection(cost, demand, iters=100, verbose=False):
     print demand
 
     # 1. Set up initial guess (qty=0 for all players)
-    qty = numpy.zeros([N,1])
+    #qty = numpy.zeros(N)
+    qty = numpy.repeat(-10e9,N)
     print "Initial Guess"
     print qty
 
@@ -44,7 +47,7 @@ def cournotEqmSelection(cost, demand, iters=100, verbose=False):
 
     # 3. Run Gauss-Jacobi
 
-    print "\nBeginning Gauss-Jacobi Iterations"
+    print "\nBeginning Iterations"
     print "================================="
 
     converge = numpy.zeros([N,1])
@@ -52,34 +55,48 @@ def cournotEqmSelection(cost, demand, iters=100, verbose=False):
 
     for i in xrange(100):
 
-        for n in xrange(N):
-            # Best Response Function of Firm N
-            # given that every other firm m produces qty[m]
-            qtyN = (demand[0] - numpy.sum(qty) + qty[n]) / (2 + cost[n] * demand[1])
+        Q = numpy.sum(math.e ** qty)
 
-            if verbose:
-                print qtyN
-
-            converge[n] = qtyN == qty[n]
-            qty[n] = qtyN
+        if algo == "gj":
+            # Gauss-Jacobi Step
             
+            qtyN = map(math.log,(demand[0] - Q + math.e ** qty) / (2 + cost * demand[1]))
+            #qtyN = (qtyN > numpy.zeros(N)) * qtyN
+
+            converge = abs(qtyN - qty)
+
+            qty = numpy.copy(qtyN)
+
+        if algo == "gs":
+            # Gauss-Seidel Step
+            for n in xrange(N):
+                # Best Response Function of Firm N
+                # given that every other firm m produces qty[m]
+
+                qtyN = math.log((demand[0] - Q + math.e ** qty[n]) / (2 + cost[n] * demand[1]))
+
+                converge[n] = abs(qtyN - qty[n])
+
+                qty[n] = qtyN
+        
         # Check if converged
-        if sum(converge) == N:
-            print "Converged after", i, "iterations"
+        if max(converge) < tol:
+            print "CONVERGED: Converged after", i, "iterations"
+            print converge
             print "=================================\n"
 
             converged = True
             break
-    
+
     if converged == False:
-        print "Stopped after", iters, "iterations"
+        print "REACHED MAX ITERATIONS: Stopped after", iters, "iterations"
         print "=================================\n"
 
     # 4. Calculate Price and Display Results
-    price = demand[0] - demand[1] * sum(qty)
+    price = (demand[0] - sum(math.e ** qty)) / demand[1]
 
     print "Quantity"
-    print qty
+    print math.e ** qty
 
     print "Price"
     print price
@@ -88,20 +105,17 @@ def cournotEqmSelection(cost, demand, iters=100, verbose=False):
 
 def main():
 
-    #rcost = numpy.array([[1,3]]).T
-
-    #rdemand = numpy.array([0.5,0.5])
-
     # Set number of players
-    n = 2
-    
+    n = 6
     # Set max number of iterations
     iters = 100
 
-    rcost = numpy.random.rand(n,1)
-    rdemand = numpy.random.rand(n,1)
+    rcost = 10 * numpy.random.rand(n)
 
-    cournotEqmSelection(rcost, rdemand, iters=iters)
+    rdemand = numpy.array([100 * numpy.random.rand(), 10 * numpy.random.rand()])
+
+
+    cournotEqmSelection(rcost, rdemand, iters=iters, algo='gs')
 
     return 0
 
