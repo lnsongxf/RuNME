@@ -3,20 +3,23 @@ library('ipoptr')
 
 # Set Problem Parameters
 
-nAgents <- 5
-nGoods  <- 5
+nAgents <- 25
+nGoods  <- 25
 
 # a
 a <- rep(1,nAgents*nGoods)
+#a <- runif(nAgents*nGoods)
 
 # nu
 nu <- rep(-2,nAgents*nGoods)
+nu <- -1 * runif(nAgents*nGoods)
 
 # lambda (Social Weights)
 lambda <- rep(1,nAgents)
 
 # endowment
-e <- rep(1,nAgents*nGoods)
+#e <- rep(1,nAgents*nGoods)
+e <- runif(nAgents*nGoods)
 
 # calculate total amounts of each good (for constraint)
 ej <- colSums(matrix(e, nAgents, nGoods, byrow=TRUE))

@@ -106,7 +106,7 @@ def cournotEqmSelection(cost, demand, iters=100, tol=1e-10, algo="gj"):
 def main():
 
     # Set number of players
-    n = 6
+    n = 5
     # Set max number of iterations
     iters = 100
 

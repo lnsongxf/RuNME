@@ -2,6 +2,8 @@
 import numpy
 import matplotlib.pyplot as ppt
 
+import sys
+
 def iterate(wage, wealth, p, p0, p1, alpha, gamma):
 
     nextpd = []
@@ -93,14 +95,12 @@ def wealthDistribution(alpha, gamma, pi0, pi1, N, iters=300):
 
     # Plot W = 0
     ppt.plot(grid,prob[:,0])
-    #ppt.scatter(grid,prob[:,0])
 
 
     # Plot W = 1
     ppt.plot(grid,prob[:,1])
-    #ppt.scatter(grid,prob[:,1], c='r')
     #ppt.show()
-    ppt.savefig(str(alpha) + "_" + str(gamma) + "_" + str(pi0) + "_" + str(pi1) + "_" + str(N) + "_plot.png")
+    ppt.savefig(str(alpha) + "_" + str(gamma) + "_" + str(pi0) + "_" + str(pi1) + "_" + str(N) + "_" + str(iters) + "_plot.png")
     ppt.close()
 
     print "SUM: ", sum(prob)
@@ -114,6 +114,7 @@ def main():
     p0_ = [0.1,0.5,0.9]
     p1_ = [0.1,0.5,0.9]
     N_ = [100,500,1000]#,5000,10000]
+    iters = [10,100,1000]
 
     for a in a_:
         for g in g_:
@@ -123,7 +124,8 @@ def main():
 
                         print [a,g,p0,p1,N]
                         try:
-                            wealthDistribution(0.9,0.1,0.1,0.5,10000)
+                            for i in iters:
+                                wealthDistribution(a,g,p0,p1,N,iters=i)
                             sys.exit()
                         except:
                             continue
