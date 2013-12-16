@@ -73,15 +73,15 @@ def wealthProblem(valueFnIt = False, policyFnIt = False):
 	s = 2
 
 	# Optimization Parameters
-	tol = 0.01
-	maxIts = 300
+	tol = 0.1
+	maxIts = 10
 	dif = tol + 1000
 	its = 0
 	kgrid = 99
 
 	# utility of consumption
 	def utility(c):
-		return (1 / (1 - s)) * (c**(1-s))
+		return (1 / (1 - s)) * (c**(1-s) - 1)
 
 	# production and capital net depreciation
 	def production(k0):
@@ -152,6 +152,7 @@ def wealthProblem(valueFnIt = False, policyFnIt = False):
 		return -val
 
 	# 3. Value Function Iteration
+	#
 	if valueFnIt == True:
 		while dif > tol and its < maxIts:
 
@@ -180,21 +181,44 @@ def wealthProblem(valueFnIt = False, policyFnIt = False):
 			print "Finished Iteration",its
 
 	# 4. Policy Function Iteration
+	#
 	if policyFnIt == True:
+
+		# Run one iteration of value function to get initial value function
+		# and policy function
+		for i in xrange(n):
+			# Current capital k0
+			k0 = kmat[i]
+
+			# Find optimal level of k_{t+1}
+			# given current iteration of value function
+			res = opt.minimize(valFn, x0=(kstar), method='L-BFGS-B', bounds=bnds)
+			k1 = res.x
+
+			v1[i] = -valFn(k1)
+			kl1[i] = k1
+
+		v0 = np.copy(v1)
+
 		while dif > tol and its < maxIts:
 
 			# 1. Compute next policy function iteration
 			for i in xrange(n):
+				# Current capital k0
 				k0 = kmat[i]
-				print k0,
+
+				# Find optimal level of k_{t+1}
+				# given current iteration of value function
 				res = opt.minimize(valFn, x0=kstar, method='L-BFGS-B', bounds=bnds)
 				kl1[i] = res.x
-				print kl1[i]
+				
+			print "kl1",kl1 # current policy function iteration
 
-			# 2. Compute each period utility
+			# 2. Compute returns for each state
 			for i in xrange(n):
 				consumption = production(kmat[i]) - kl1[i]
 				p1[i] = utility(consumption)
+			print "p1",p1
 
 			# 3. Compute next value function iteration
 
@@ -203,16 +227,28 @@ def wealthProblem(valueFnIt = False, policyFnIt = False):
 
 			Q = np.zeros((n,n))
 			for i in xrange(n):
-				Q[i,kl1[i]] = 1
+				# find the entry just below
+				klo = np.argmax(kmat > kl1[i])
+				khi = klo + 1
+				if kl1[i] % grid > grid/2:
+					Q[i,khi] = 1
+				else:
+					Q[i,klo] = 1
 
-			print beta * Q
-			print np.linalg.det( beta * Q)
+			#print "to invert",np.eye(n) - beta * Q
+			#print "det",np.linalg.det( np.eye(n) - beta * Q)
 
-			v1 = (np.eye(n) - beta * Q)**-1 * p1
+			v1 = np.asarray(np.linalg.inv(np.eye(n) - beta * Q) * np.matrix(p1).T)
+			v1 = v1.reshape(len(v1))
+			#print type(v1), type(v0)
+			#print "v1",v1
+			print "v0",v0
 
 			# calculate norm of new and old value function
 			# and update values (careful w/ copying values!)
 			vdiff = v1 - v0
+			#print "vdiff", vdiff
+			#print np.multiply(vdiff, vdiff)
 			dif = np.sqrt(np.dot(vdiff, vdiff))
 			v0 = np.copy(v1)
 			its = its + 1
@@ -220,17 +256,16 @@ def wealthProblem(valueFnIt = False, policyFnIt = False):
 			print "Norm",dif
 			print "Finished Iteration",its
 
-			sys.exit()
 
 
 	return (kmat,v0,kl1)
 
 if __name__ == "__main__":
     print "LOADING DYNAMIC PROGRAMMING PACKAGE"
-    x = wealthProblem(policyFnIt = True)
-    # kmat = x[0]
-    # v0 = x[1]
-    # kl1 = x[2]
-    # ppt.clf()
-    # ppt.plot(x[0],x[1])
-    # ppt.savefig('myfig')
+    x = wealthProblem(valueFnIt = True)
+    kmat = x[0]
+    v0 = x[1]
+    kl1 = x[2]
+    ppt.clf()
+    ppt.plot(x[0],x[1])
+    ppt.savefig('myfig')
