@@ -73,8 +73,8 @@ def wealthProblem(valueFnIt = False, policyFnIt = False):
 	s = 2
 
 	# Optimization Parameters
-	tol = 0.1
-	maxIts = 10
+	tol = 0.01
+	maxIts = 300
 	dif = tol + 1000
 	its = 0
 	kgrid = 99
@@ -101,8 +101,8 @@ def wealthProblem(valueFnIt = False, policyFnIt = False):
 	kstar = steadyState()[0]
 
 	# state bounds (within 75% of the steady state)
-	kmin = 0.25 * kstar
-	kmax = 1.75 * kstar
+	kmin = 1.00 #0.25 * kstar
+	kmax = 7.00 #1.75 * kstar
 	bnds = ((kmin, kmax),)
 
 	# Grid Parameters
@@ -159,7 +159,7 @@ def wealthProblem(valueFnIt = False, policyFnIt = False):
 			# For each possible control
 			# k_{t+1}
 			for i in xrange(n):
-				# set control
+				# current state
 				k0 = kmat[i]
 
 				# find the control which maximizes the value function

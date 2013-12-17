@@ -15,6 +15,8 @@ from scipy import integrate
 # numpy.polynomial.polynomial: Handles polynomials
 from numpy.polynomial import polynomial
 
+import sys
+
 # From Algorithm 12.5 in Judd 1998, we have the following structure:
 # Objective: Solve the Bellman equation
 # Step 0. Initialization: Choose function form for Vhat and approximation grid X.
@@ -25,50 +27,41 @@ from numpy.polynomial import polynomial
 
 class parametricDP:
 
-	def __init__(self, parameters, optParam, initial, maximize, fitting, calcError):
-		# Dictionary of parameters of model
-		self.parameters = parameters
-
-		self.min = parameters['min']
-		self.max = parameters['max']
-
-		# Dictionary of optimization parameters
-		self.optParam = optParam
-
-		# Tolerance specifications
-		self.tol = optParam['tol']
+	def __init__(self, maximize, fitting, calcError):
+		self.tol = 0.01
 		self.error = self.tol + 1
+		self.maxIt = 300
+		self.n = 10
+		self.deg = 3
 
-		# Polynomial Degree
-		self.deg = optParam.deg
+		self.alpha = 0.33
+		self.beta = 0.95
+		self.depr = 0.1
+		self.s = 2
+		self.min = 1.0
+		self.max = 7.0
 
-		# Grid length
-		self.n = optParam['n']
+		self.a = np.zeros(self.deg + 1)
+		self.v = np.zeros(self.n)
 
-		# ***Value function realizations*** #
-		self.v = np.zeros(n)
-
-		# ***Initial coefficients for approximation*** #
-		self.a = np.copy(initial)
-
-		# Function for performing maximization step (Step 1)
-		self.maximize = maximize
-
-		# Function for performing fitting step (Step 2)
-		self.fitting = fitting
-
-		# Function for calculating the error in a
-		# i.e. the error in approximation coefficients
-		self.calcError = calcError
-
-	def createGrid(self):
-		# computes grid of approximation points
-
-		# Uniform Grid
 		self.grid = np.arange(self.min, self.max, (self.max - self.min) / self.n)
 
-		# Chebyshev Grid
-		# (to implement)
+		self.maximize = maximize
+		self.fitting = fitting
+		self.calcError = calcError
+
+		# compute initial guess
+		# guess = no savings
+		guessF = lambda k: (1 / (1 - self.s)) * (k**self.alpha - self.depr * k) ** (1 - self.s)
+
+		for i in xrange(self.n):
+			# no savings - kprime = k0
+			self.v[i] = guessF(self.grid[i])
+
+		self.a = polynomial.polyfit(self.grid, self.v, self.deg)
+
+		print "INITIAL VALUE FUNCTION",self.v
+		print "INITIAL APPROX", self.a
 
 	def solve(self):
 		# Solve the dynamic programming problem
@@ -76,32 +69,39 @@ class parametricDP:
 
 		it = 0
 
-		while self.error > self.tol and it < maxIt:
+		while self.error > self.tol and it < self.maxIt:
 			# Save previous a
 			a0 = np.copy(self.a)
 
 			# Maximize
-			self.v = self.maximize(self)
+			res = self.maximize(self)
+			self.v = res[0]
+			self.policy = res[1]
 
 			# Fit
 			self.a = self.fitting(self)
 
 			# Update error
-			self.error = self.calcError(a, a0)
+			self.error = self.calcError(self, self.a, a0)
 
-			# Update a
-			a = np.copy(a0)
+			print "Iteration", it
+
+			#print "NEW VALUE FUNCTION", self.v
+			#print "NEW APPROX", self.a
+			
+			print "Error", self.error
+			print "\n"
 
 			it = it + 1
 
-		return (a,v)
+		return (self.a,self.v)
 
 # Problem Description
 # consumption problem as in dypro.py
 
 optParam = {}
-optParam['tol'] = 0.1
-optParam['maxIt'] = 10
+optParam['tol'] = 0.01
+optParam['maxIt'] = 300
 optParam['n'] = 99.0
 optParam['deg'] = 5
 
@@ -110,77 +110,169 @@ param['alpha'] = 0.33
 param['beta'] = 0.95
 param['depr'] = 0.1
 param['s'] = 2
-param['min'] = 0.0
+param['min'] = 1.0
 param['max'] = 7.0
 
-initial = np.zeros(optParam['n'])
+initialA = np.zeros(optParam['deg'] + 1)
+initialV = np.zeros(optParam['n'])
 
 # Functions
 
 
 
-def maximize(a, s, alpha, beta, depr, grid):
-	# Find the value of v that maximizes 
+# def maximize0(a, s, alpha, beta, depr, grid, n):
+# 	# Find the value of v that maximizes 
+# 	# given self.a
+
+# 	# set up objective function
+
+# 	def utility(consumption):
+# 		return (1 / (1 - s)) * consumption**(1 - s)
+
+# 	def production(k0):
+# 		return k0 ** alpha + (1 - depr) * k0
+
+# 	def obj(kprime):
+# 		# objective function for optimization problem
+
+# 		# Compute current period value
+# 		consumption = production(k0) - kprime
+# 		curr = utility(consumption) # consumption in current period
+
+# 		# Compute continuation value
+# 		# use x_i point		
+# 		cont = 0
+# 		val = polynomial.polyval(kprime, a)
+
+# 		return -(curr + beta * cont)
+
+# 	v = np.zeros(n)
+
+# 	for i in xrange(n):
+
+# 		k0 = grid[i]
+
+# 		x0 = 0
+# 		minbds = grid[0]
+# 		maxbds = min(grid[-1], production(grid[i])**alpha + (1 - depr) * grid[i])
+# 		bounds = ((minbds, maxbds),)
+
+# 		res = optimize.minimize(obj, x0=x0, method='L-BFGS-B', bounds=bounds)
+# 		ubest = res.x
+# 		v[i] = -obj(ubest)
+
+# 	return v
+
+def maximize(self):
+	# Find the maximum value of v
 	# given self.a
 
 	# set up objective function
 
 	def utility(consumption):
-		return (1 / (1 - s)) * consumption**(1 - s)
+		return consumption**(1 - self.s) / (1 - self.s)
 
 	def production(k0):
-		return k0 ** alpha + (1 - depr) * k0
+		return k0 ** self.alpha + (1 - self.depr) * k0
 
 	def obj(kprime, k0):
 		# objective function for optimization problem
 
 		# Compute current period value
-		consumption = production(k0)
-		curr = utility(consumption) # consumption in current period
+		curr = utility(production(k0) - kprime) # consumption in current period
 
 		# Compute continuation value
+		# value of next period being kprime (since control = next pd state  in this model)
 		# use x_i point		
 		cont = 0
-		val = polynomial.polyval(kprime, a)
+		val = polynomial.polyval(kprime, self.a)
+		cont = val
 
-		# Q * vals
-		#p2 = 
+		return -(curr + self.beta * cont)
 
-		return -(curr + beta * cont)
+	v = np.zeros(self.n)
 
-	x0 = 0
-	minbds = grid[0]
-	maxbds = min(grid[-1], production(k0)**alpha + (1 - depr) * k0
-	bounds = ((minbds, maxbds),)
+	policy = np.zeros(self.n)
 
-	res = optimize.minimize(obj, x0=, method='L-BFGS-B', bounds=bounds)
+	# for each point x_j, compute new v_j
+	for i in xrange(self.n):
 
-	return 0
+		# Compute the value of the maximizatin problem
+		# given a continuation function described by
+		# polynomials w/ coefficients a, and 
+		# capital is k0 = self.grid[i]
+
+		k0 = self.grid[i]
+		
+		minbds = self.grid[0]
+		maxbds = min(self.grid[-1], self.grid[i]**self.alpha + (1 - self.depr) * self.grid[i])
+		x0 = (minbds + maxbds) / 2.0 # pick a better starting point
+		bounds = ((minbds, maxbds),)
+
+		# Perform optimization to find best control
+		res = optimize.minimize(lambda kprime: obj(kprime, k0), x0=x0, method='L-BFGS-B', bounds=bounds)
+
+		# Check optimization results
+		if res.success != True:
+			print "Optimization Failed"
+			print res
+			sys.exit()
+
+		u = res.x
+
+		policy[i] = u
+		v[i] = -obj(u,k0)
+		self.v[i] = -obj(u,k0)
+
+	#print policy
+
+	return (v, policy)
 
 grid = np.arange(param['min'], param['max'], (param['max'] - param['min']) / optParam['n'])
 
-def fitting(v, grid, deg):
-	# Find the value of a that fits 
-	# given self.v
+# def fitting0(v, grid, deg):
+# 	# Find the value of a that fits 
+# 	# given self.v
 
-	# Least Squares Approximation with polynomials
-	coef = polynomial.polyfit(grid, v, deg)
+# 	# Least Squares Approximation with polynomials
+# 	coef = polynomial.polyfit(grid, v, deg)
 
-	# Approximation with Chebyshev polynomials
-	# TODO
+# 	# Approximation with Chebyshev polynomials
+# 	# TODO
 
+# 	return coef
+
+def fitting(self):
+	coef = polynomial.polyfit(self.grid, self.v, self.deg)
 	return coef
 
+# def calcError0(a, aprime, n, grid):
+# 	# Evaluates the polynomials described by coefficients
+# 	# a and aprime at each point on the grid
+# 	# and calculates the norm of the difference between
+# 	# the two vectors
 
-def calcError(a, aprime, n, grid):
+# 	diff = np.zeros(n)
+# 	for i in xrange(n):
+# 		# evaluate polynomials
+# 		diff[i] = polynomial.polyval(grid[i], a) - polynomial.polyval(grid[i], aprime)
+	
+# 	return np.sqrt(np.dot(diff,diff))
+
+def calcError(self, aprime, a):
 	# Evaluates the polynomials described by coefficients
 	# a and aprime at each point on the grid
 	# and calculates the norm of the difference between
 	# the two vectors
 
-	diff = np.zeros(n)
-	for i in xrange(n):
+	diff = np.zeros(self.n)
+	for i in xrange(self.n):
 		# evaluate polynomials
-		diff[i] = polynomial.polyval(grid[i], a) - polynomial.polyval(grid[i], aprime)
+		diff[i] = polynomial.polyval(self.grid[i], a) - polynomial.polyval(self.grid[i], aprime)
 	
 	return np.sqrt(np.dot(diff,diff))
+
+dp = parametricDP(maximize, fitting, calcError)
+res = dp.solve()
+#print res[0]
+#print res[1]
