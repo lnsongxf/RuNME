@@ -27,13 +27,13 @@ import matplotlib.pyplot as ppt
 # x - controls
 # y - state variables
 def utilityDefault(x, y):
-	k1, l = x
+	k1= x
 	k0, w = y
 
-	if l >= 1 or k0**0.33 + (0.9 * k0) - k1< 0:
+	if k0**0.33 + (0.9 * k0) - k1< 0:
 		return -1
 
-	return (k0**0.33 + (0.9 * k0) - k1 + (w * l))**0.5
+	return (k0**0.33 + (0.9 * k0) - k1)**0.5
 
 def bequestValueDefault(x):
 	return x**0.5
@@ -55,16 +55,14 @@ opts['production'] = productionDefault
 opts['statewage'] = statewageDefault
 opts['beta'] = 0.9
 
-# Mean wages over time
-# opts['wages'] = None
+# bounds for variables
+opts['bounds'] = lambda s: ((0, opts['production'](s[0],0)),)
+opts['x0'] = lambda s: np.array(sum(opts['bounds'](s)[0]) / 2.)
+print len( opts['bounds']((0,0),) )
+print opts['x0']    ((0,0),)
 
 # Number of periods
 opts['T'] = 1
-
-# Number states describing
-# change in wages
-# opts['states'] = [0,1,2]
-# opts['trans'] = mTrans
 
 ## Optimization Parameters
 
@@ -82,9 +80,46 @@ result = execute(deg = opts['deg'], pts=opts['pts'], opts=opts)
 print "CASE ONE COMPLETE"
 
 ########################################
+# Case 1b.
+# Like case one, but with
+# modified utility function
+########################################
+
+def utilityDefault(x, y):
+	k1= x
+	k0, w = y
+
+	if k0**0.33 + (0.9 * k0) - k1< 0:
+		return -1
+
+	return np.log(k0**0.33 + (0.9 * k0) - k1)
+
+def bequestValueDefault(x):
+	return np.log(x)
+
+## Execute the solver
+result = execute(deg = opts['deg'], pts=opts['pts'], opts=opts)
+print "CASE ONE PART B COMPLETE"
+
+########################################
 # Case 2.
 # One period with elastic labor
 ########################################
+
+def utilityDefault(x, y):
+	k1, l = x
+	k0, w = y
+
+	if l >= 1 or k0**0.33 + (0.9 * k0) - k1< 0:
+		return -1
+
+	return (k0**0.33 + (0.9 * k0) - k1 + (w * l))**0.5
+
+# New bounds including labor as control
+kbounds = lambda s: (0, opts['production'](s[0],0) + s[1])
+lbounds = lambda s: (0,1)
+opts['bounds'] = lambda s: (kbounds(s), lbounds(s))
+opts['x0'] = lambda s: np.array([sum(kbounds(s)) / 2.,sum(lbounds(s)) / 2.])
 
 # Add labor to utility function
 def utilityDefault(x, y):
@@ -115,15 +150,11 @@ print "CASE TWO COMPLETE"
 opts['T'] = 10
 wages = np.zeros(opts['T'])
 period = int(np.floor(opts['T']/3.))
-if period == 0:
-	print "Too few periods - setting constant wages"
-	wages[:] = 5
-else:
-	for i in xrange(period+1):
-		wages[i] = i * (5. / period)# growing up to 5
-	wages[period:2*period] = 5.
-	for i in xrange(2*period,opts['T']):
-		wages[i] = 5. - 2. * (i - 2.*period) / (opts['T'] - 2.*period)
+for i in xrange(period+1):
+	wages[i] = i * (5. / period)# growing up to 5
+wages[period:2*period] = 5.
+for i in xrange(2*period,opts['T']):
+	wages[i] = 5. - 2. * (i - 2.*period) / (opts['T'] - 2.*period)
 opts['wages'] = wages
 
 ## Execute the solver

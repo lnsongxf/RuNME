@@ -249,7 +249,9 @@ def maxim(xi, vt, state, opts=None):
 	# Initialize arrays
 	n = len(xi)          # num grid points
 	vi = np.zeros(n)     # value
-	ui = np.zeros((n,2)) # policy
+	
+	nControls = len(opts['bounds']((0,0)))
+	ui = np.zeros((n,nControls)) # policy
 
 	# If the state affects the wage
 	wage = opts['statewage'](state, wage)
@@ -258,6 +260,7 @@ def maxim(xi, vt, state, opts=None):
 	# function of policy (first variable) and state
 	# (second variable)
 	def obj(policy,k0):
+
 		# compute current period
 		curr = opts['utility'](policy,[k0,wage])
 
@@ -275,19 +278,13 @@ def maxim(xi, vt, state, opts=None):
 	for i in xrange(len(xi)):
 		k0 = xi[i]
 
-		# bounds for variables
-		kbounds = (0, opts['production'](k0,0) + wage)
-		lbounds = (0,1)
-
-		# initial guess: midpoint of max and min
-		# Note: can we guarantee within constraints?
-		x0 = np.array([(kbounds[0] + kbounds[1]) / 2.,(lbounds[0] + lbounds[1]) / 2.])
+		s = [k0, wage]
 
 		## Solve Optimization Problem
 		res = optimize.minimize(fun=lambda x: obj(x,k0), 
-								x0=x0,
+								x0=opts['x0'](s),
 								method="SLSQP",
-								bounds=(kbounds, lbounds),
+								bounds=opts['bounds'](s),
 								options={'maxiter':1000})
 
 		# Check optimization status
@@ -300,8 +297,6 @@ def maxim(xi, vt, state, opts=None):
 		# compute the value of the optimal policy
 		vi[i] = -obj(res.x, k0)
 		ui[i,:] = res.x
-
-		#print k0, np.round(res.x[0],5), np.round(res.x[1],5), -obj(res.x, k0)
 
 	return [vi,ui]
 
@@ -336,6 +331,7 @@ def checkOptions(opts):
 
 	assert 'init' in opts, "No initial value for Range"
 	assert 'end' in opts, "No final value for Range"
+	assert 'bounds' in opts, "No bounds for control variables"
 
 	# Variables with default values if not supplied
 
@@ -399,7 +395,7 @@ def execute(deg, pts, opts, preserveShape=False):
 
 	# Handle last time period separately due to 
 	# needing to accomodate bequest
-	print "COMPUTING PERIOD", opts['T']-1
+	print "\tCOMPUTING PERIOD", opts['T']-1
 
 	# Initialize final time period value function
 	bequest = [opts['bequest'](x) for x in grid]
@@ -417,7 +413,7 @@ def execute(deg, pts, opts, preserveShape=False):
 	############################################
 
 	for t in reversed(range(opts['T'] - 1)):
-		print "\nCOMPUTING PERIOD", t
+		print "\n\tCOMPUTING PERIOD", t
 
 		# approximate next period value function
 		poly = [approxshape(grid, vi[state], opts['init'], opts['end'], deg) for state in opts['states']]
