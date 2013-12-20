@@ -19,24 +19,51 @@ import matplotlib.pyplot as ppt
 ## Convenient functions for working with Chebyshev polynomials
 ##############################################################
 
+## nodes(init, end, deg)
 # Computes Chebyshev nodes over interval [init,end]
+#
+# Inputs: init - float, beginning of range
+#         end  - float, end of range
+#         deg  - int, number of points to find
+# Output: deg-length array of floats, Chebyshev nodes within the range [init,end]
+
 def nodes(init, end, deg):
     x = np.polynomial.chebyshev.chebgauss(deg)
     return (x[0] + 1.) * (end - init) / 2. + init
 
+## normalize(x, init, end)
 # Normalizes x in [init,end] to [init2,end2]
-def normalize(x, init, end):
-	return (float(x) - init) / (end - init) * 2. - 1.
+#
+# Inputs: x    - float, point to be normalized
+#         init - float, beginning of range
+#         end  - float, end of range
+# Output: float, x normalized to range [init2,end2]
 
-def unnormalize(x, init, end):
-	return (float(x) + 1.) / (2.) * (end - init) + init
+def normalize(x, init, end, init2=-1, end2=1):
+	return (float(x) - init) / (end - init) * (end2 - init2) + init2
 
+## chebval(x, c, init, end)
 # Evaluates the chebyshev polynomial at point x, after
 # normalizing x to [-1,1] from [init,end]
+# 
+# Inputs: x    - float, point to evaluation the polynomial at
+#         c    - array of floats, coefficients of chebyshev polynomial
+#         init - float, beginning of range
+#         end  - float, end of range
+# Output: float, c evaluated at point x
+
 def chebval(x, c, init, end):
 	return np.polynomial.chebyshev.chebval(normalize(x,init,end),c)
 
+## plotpoly(grid, poly, init, end)
 # Plots a chebyshev polynomial over some set of points grid
+# 
+# Inputs: grid - array of floats, points to plot the polynomial at
+#         c    - array of floats, coefficients of chebyshev polynomial
+#         init - float, beginning of range
+#         end  - float, end of range
+# Output: float, c evaluated at point x 
+
 def plotpoly(grid, poly, init, end):
 	vi = map(lambda x: chebval(x, poly, init, end), grid)
 	ppt.clf()
@@ -209,7 +236,7 @@ def maxim(xi, vt, state=[0,0], opts=None):
 
 		# and then take the conditional mean of the value function
 		# at each state
-		cont = mTrans[state,:].dot(cont)
+		cont = opts['trans'][state,:].dot(cont)
 
 		return -(curr + opts['beta'] * cont)
 
@@ -255,27 +282,18 @@ def maxim(xi, vt, state=[0,0], opts=None):
 ##############################################################
 
 ##############################################################
-## Maximization Functions
+## Execution Function
 ##############################################################
 
-# Computes the value of a dynamic programming problem
-# over T periods, given range [init,end]
-def execute(deg, pts, opts, preserveShape=False):
+## checkOptions(opts)
+#
+# Checks validity of options and provides default values
+# if necessary
+#
+# Inputs: opts - dictionary
+# Output: opts - dictionary
 
-	##########
-	## Processing options
-	##########
-
-	#####
-	# the utility function supplied should
-	# take two arguments, x and k0
-	# where x is a k-length array of the controls
-	# and k0 is the single state variable
-	#
-	# for example, if we were solving a problem
-	# where an agent chooses savings and labor,
-	# we might let x[0] = k_{t+1} and x[1] = l
-	#####
+def checkOptions(opts):
 
 	# Assertions about our options dictionary
 	# for items where there is no default value
@@ -293,11 +311,23 @@ def execute(deg, pts, opts, preserveShape=False):
 	# Variables with default values if not supplied
 
 	opts['states'] = opts['states'] if 'states' in opts else [0]
-	opts['wages'] = opts['wages'] if 'wages' in opts else np.zeros(T)
+	opts['wages'] = opts['wages'] if 'wages' in opts else np.zeros(opts['T'])
 	opts['trans'] = opts['trans'] if 'trans' in opts else np.ones(1)
 
 	assert np.array(opts['trans']).shape == (len(opts['states']), len(opts['states'])), "Transition matrix malformed."
-	assert len(opts['wages']) == T, "Wages malformed"
+	assert len(opts['wages']) == opts['T'], "Wages malformed"
+
+	return opts	
+
+# Computes the value of a dynamic programming problem
+# over T periods, given range [init,end]
+def execute(deg, pts, opts, preserveShape=False):
+
+	##########
+	## Processing options
+	##########
+
+	opts = checkOptions(opts)
 
 	## Shape-Preservation Option
 	# Choose whether to try to preserve shape during the
@@ -328,20 +358,20 @@ def execute(deg, pts, opts, preserveShape=False):
 	value.append(poly)
 
 	# compute second to last period value function points
-	vi, ui = zip(*[maxim(grid, poly, state=[state, wages[-1]], opts=opts) for state in opts['states']])
+	vi, ui = zip(*[maxim(grid, poly, state=[state, opts['wages'][-1]], opts=opts) for state in opts['states']])
 	policy.append(ui)
 
 	## Iterate back through previous periods
 	# Set T=1 for single period
 	for t in reversed(range(opts['T'] - 1)):
-		#print "\nCOMPUTING PERIOD", t
+		print "\nCOMPUTING PERIOD", t
 
 		# approximate next period value function
 		poly = [approxshape(grid, vi[state], opts['init'], opts['end'], deg) for state in opts['states']]
 		value.append(poly)
 
 		# solve for value function at points
-		vi, ui = zip(*[maxim(grid, poly, state=[state, wages[t]], opts=opts) for state in opts['states']])
+		vi, ui = zip(*[maxim(grid, poly, state=[state, opts['wages'][t]], opts=opts) for state in opts['states']])
 		policy.append(ui)
 
 	# Approximate final polynomial (for first period)
@@ -357,135 +387,3 @@ def execute(deg, pts, opts, preserveShape=False):
 	# Note: value here is a list of coefficients, 
 	# policy is a list of values at each grid pt
 	return (value, policy)
-
-# Just some code to test my useful functions
-
-# x - controls
-# y - state variables
-def utilityDefault(x, y):
-
-	k1 = x[0]
-	l = x[1]
-
-	k0 = y[0]
-	w = y[1]
-
-	# Make sure we don't try to take
-	# the square root of a negative
-
-	if l >= 1:
-		return -1
-	if k0**0.33 + (0.9 * k0) - k1 + (w * l) < 0:
-		return -1
-
-	return (k0**0.33 + (0.9 * k0) - k1 + (w * l))**0.5 + (1. - l)**0.5
-
-def bequestValue(x):
-	return x**0.5
-
-def productionDefault(k0, l):
-		return k0 ** 0.5 + (1 - 0.1) * k0
-
-T = 10
-
-wages = np.zeros(T)
-period = int(np.floor(T/3.))
-if period == 0:
-	print "Too few periods - setting constant wages"
-	wages[:] = 5
-else:
-	for i in xrange(period+1):
-		wages[i] = i * (5. / period)# growing up to 5
-	wages[period:2*period] = 5.
-	for i in xrange(2*period,T):
-		wages[i] = 5. - 2. * (i - 2.*period) / (T - 2.*period)
-
-mTrans = np.zeros((3,3))
-mTrans[0,:] = [0.75,0.2,0.05]
-mTrans[1,:] = [0.25,.5,.25]
-mTrans[2,:] = [0.05,0.2,0.75]
-
-opts = {}
-
-## Model Parameters
-
-# Utility and Production Functions
-opts['utility'] = utilityDefault
-opts['bequest'] = bequestValue
-opts['production'] = productionDefault
-opts['beta'] = 0.9
-
-# Mean wages over time
-opts['wages'] = wages
-
-# Number of periods
-opts['T'] = T
-
-# Number states describing
-# change in wages
-opts['states'] = [0,1,2]
-opts['trans'] = mTrans
-
-## Optimization Parameters
-
-# Degree of Chebyshev Polynomial
-# and number of nodes
-opts['deg'] = 5.
-opts['pts'] = 40.
-
-# Range of points
-opts['init'] = 0.1
-opts['end'] = 10.
-
-## Execute the solver
-r = execute(deg = 5, pts=100, opts=opts)[0]
-#r2 = execute(deg = 5, pts=40, opts=opts, preserveShape=True)
-
-# two periods with labor choice
-# analytic soln
-
-grid = np.arange(0.1,10,0.01)
-
-income = lambda k0: k0**0.33 + 0.9 * k0
-labor = lambda k0: (25. + 0.81*25. - income(k0)) / (5. + 25. + 25. * 0.81)
-c1 = lambda k0: 25. * (1. - labor(k0))
-c2 = lambda k0: 0.81 * c1(k0)
-u = lambda k0: c1(k0)**0.5 + 0.9 * c2(k0)**0.5 + (1.-labor(k0))**0.5
-
-grid = np.arange(0.1,10,0.01)
-# grid = nodes(0.1,10,40)
-# yactual = map(u, grid)
-# yapprox = map(lambda x: chebval(x, r[0][0], 0.1, 10), grid)
-yapprox1 = map(lambda x: chebval(x, r[0][1], 0.1, 10), grid)
-# yapprox2 = map(lambda x: chebval(x, r[0][2], 0.1, 10), grid)
-
-# yapproxs = map(lambda x: chebval(x, r2[0][0], 0.1, 10), grid)
-# yapprox1s = map(lambda x: chebval(x, r2[0][1], 0.1, 10), grid)
-# yapprox2s = map(lambda x: chebval(x, r2[0][2], 0.1, 10), grid)
-
-# yapprox = r[0][1]
-# yapprox1 = r[30][1]
-# yapprox2 = r[59][1]
-
-# yapproxs = r2[0][1]
-# yapprox1s = r2[30][1]
-# yapprox2s = r2[59][1]
-
-# print len(grid), len(yapprox1)
-
-ppt.clf()
-ppt.plot(grid,yapprox1)
-ppt.axis([0,10,0,20])
-ppt.xlabel('k0')
-ppt.ylabel('v')
-ppt.savefig('myplot')
-
-# ppt.plot(grid,yapprox)
-# ppt.plot(grid,yapprox2)
-
-# ppt.plot(grid,yapprox1s)
-# ppt.plot(grid,yapproxs)
-# ppt.plot(grid,yapprox2s)
-
-# # ppt.plot(grid,yactual,'k')
-# ppt.show()
