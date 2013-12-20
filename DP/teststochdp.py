@@ -62,6 +62,16 @@ mTrans[0,:] = [0.75,0.2,0.05]
 mTrans[1,:] = [0.25,.5,.25]
 mTrans[2,:] = [0.05,0.2,0.75]
 
+# Stochastic Wages States
+# computes the wage given the current state
+def statewage(state, wage):
+	if state == 0:
+		return wage * 0.9
+	elif state == 1:
+		return wage * 1
+	elif state == 2:
+		return wage * 1.1
+
 opts = {}
 
 ## Model Parameters

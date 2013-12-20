@@ -1,12 +1,6 @@
-import numpy as np
-from scipy import optimize
-import sys
-
-import matplotlib.pyplot as ppt
-
-#from chebfun import *
-
-#import numpy as np
+##############################################################
+## NME 2013 FINAL - DYNAMIC PROGRAMMING
+##############################################################
 
 ## Runnan Yang 2013
 ## Solves Life-cycle dynamic programming problems
@@ -14,6 +8,21 @@ import matplotlib.pyplot as ppt
 ## with a Chebyshev polynomial and performing
 ## backwards induction from the final to first period
 
+##############################################################
+## External Libraries
+##############################################################
+
+## Numpy - General Numerical Library
+import numpy as np
+
+## Scipy.optimize - optimization library
+from scipy import optimize
+
+## sys - General System Commands
+import sys
+
+## matplotlib.pyplot - Plotting and Images
+import matplotlib.pyplot as ppt
 
 ##############################################################
 ## Convenient functions for working with Chebyshev polynomials
@@ -78,14 +87,23 @@ def plotpoly(grid, poly, init, end):
 ## Approximation Functions
 ##############################################################
 
+## approxCheb(xi, vi, init, end, deg)
 # Approximates a function whose values at the points xi
 # are vi, where xi are in range [init,end]
-# Returns a list of coefficients for a 
-# Chebyshev polynomial
-# Status: DONE
+#
+# Inputs: xi   - array of floats, grid of nodes
+#         vi   - array of floats, observations of function at each
+#                point xi
+#         init - float, beginning of range
+#         end  - float, end of range
+#         deg  - int, degree of polynomial to fit
+# Output: list of floats, coefficients for a 
+#         Chebyshev polynomial
+
 def approxCheb(xi, vi, init, end, deg):
 	return np.polynomial.chebyshev.Chebyshev.fit(xi, vi, deg, domain=[init,end]).coef
 
+## approxChebshape(xi, vi, init, end, deg, shapeGrid=None)
 # Approximates a function whose values at the points xi
 # are vi, where xi are in range [init, end], while
 # ensuring that the function is monotonic increasing and
@@ -93,7 +111,6 @@ def approxCheb(xi, vi, init, end, deg):
 # 
 # Return a set of coefficients for a 
 # Chebyshev polynomial
-# Status: DONE
 
 # Set up the following minimization problem 
 # min_{c_j} \sum_{j=0}^n (c_j T_j(x_i) - v_i)**2
@@ -101,13 +118,26 @@ def approxCheb(xi, vi, init, end, deg):
 #      \sum_{j=0}^n c_j T''_j(y_i) < 0 for i in (1,m') # concavity
 # where the points y_i are shapePts, and the points x_i
 # are the chebyshev interpolation nodes
-
+#
 # Note: I use a number of nested list comprehensions in this
 # function, since they are well-optimized in Python, at the risk
 # of loss of clarity
+#
+# Inputs: xi        - array of floats, grid of nodes
+#         vi        - array of floats, observations of function at each
+#                     point xi
+#         init      - float, beginning of range
+#         end       - float, end of range
+#         deg       - int, degree of polynomial to fit
+#         shapeGrid - array of floats, grid of nodes to which to 
+#                     enforce shape(optional)
+# Output: list of floats, coefficients for a 
+#         Chebyshev polynomial
 
 def approxChebshape(xi, vi, init, end, deg, shapeGrid=None):
 	
+	## I. Set up grid and variables
+
 	# If grid of shape-preservation points not supplied,
 	# generate points uniformly on [init,end]
 	if shapeGrid == None:
@@ -116,6 +146,8 @@ def approxChebshape(xi, vi, init, end, deg, shapeGrid=None):
 	n = deg + 1
 	m = len(shapeGrid)
 	nxi = len(xi)
+
+	## II. Compute Polynomials
 		
 	# We will need to first compute T'_j(y_i), T''_j(y_i), and T_j(z_i)
 	# given these values, we can set up the constraints for the
@@ -132,7 +164,10 @@ def approxChebshape(xi, vi, init, end, deg, shapeGrid=None):
 	Tjyd = [[chebval(shapeGrid[i], p.coef, init, end) for p in Tjd] for i in range(m)]
 	Tjydd = [[chebval(shapeGrid[i], p.coef, init, end) for p in Tjdd] for i in range(m)]
 
-	## Initial Guess
+	## III. Set up Optimization Problem
+
+	# Set Up Initial Guess
+
 	# Run initial pass with coefficients from
 	# fitting without shape preservation
 
@@ -165,7 +200,8 @@ def approxChebshape(xi, vi, init, end, deg, shapeGrid=None):
 
 		return constraints
 
-	# Solve Optimization Problem
+	## IV. Solve Optimization Problem
+
 	res = optimize.fmin_slsqp(func=obj, 
 							  x0=poly0, 
 							  f_ieqcons=cons, 
@@ -193,9 +229,7 @@ def approxChebshape(xi, vi, init, end, deg, shapeGrid=None):
 # next period value function
 
 # vt is a list of chebyshev polynomials, s.t.
-# vt[0] approximates the high state in next period
-# vt[1] approximates the mean state in next period
-# vt[2] approximates the low  state in next period
+# vt[i] approximates the ith state in next period
 
 def maxim(xi, vt, state=[0,0], opts=None):
 
@@ -223,9 +257,10 @@ def maxim(xi, vt, state=[0,0], opts=None):
 		elif state == 2:
 			return wage * 1.1
 
-	wage = statewage(state, wage)
-
+	wage = opts['statewage'](state, wage)
 	
+	## Define objective function
+
 	def obj(k1,k0):
 		# compute current period
 		curr = opts['utility'](k1,[k0,wage])
@@ -240,30 +275,27 @@ def maxim(xi, vt, state=[0,0], opts=None):
 
 		return -(curr + opts['beta'] * cont)
 
+	# For each value of capital
 	for i in xrange(len(xi)):
 		k0 = xi[i]
-		# no borrowing
-		kmin = 0 
-		# max possible savings given l=1
-		kmax = opts['production'](k0,0) + wage
 
-		lmin = 0
-		lmax = 1
+		# bounds for variables
+		kbounds = (0, opts['production'](k0,0) + wage)
+		lbounds = (0,1)
 
 		# initial guess: midpoint of max and min
 		# Note: can we guarantee within constraints?
-		x0 = np.array([(kmin + kmax) / 2.,(lmin + lmax) / 2.])
+		x0 = np.array([(kbounds[0] + kbounds[1]) / 2.,(lbounds[0] + lbounds[1]) / 2.])
 
-		options = {'maxiter':1000}
-
+		## Solve Optimization Problem
 		res = optimize.minimize(fun=lambda x: obj(x,k0), 
 								x0=x0,
 								method="SLSQP",
-								bounds=((kmin,kmax),(lmin, lmax)),
-								options=options)
+								bounds=(kbounds, lbounds),
+								options={'maxiter':1000})
 
 		# Check optimization status
-		if res.success == False:
+		if not res.success:
 			# If optimization fails, shut down
 			print xi[i], k0
 			print res
@@ -301,6 +333,7 @@ def checkOptions(opts):
 	assert 'utility' in opts, "No Utility Function Specified"
 	assert 'bequest' in opts, "No Value for Final Period Specified"
 	assert 'production' in opts, "No Production Function Specified"
+	assert 'statewage' in opts, "No Function describing effect of state of wage Specified"
 
 	assert 'beta' in opts, "No beta value Specified"
 	assert 'T' in opts, "No number of periods Specified"
@@ -319,13 +352,27 @@ def checkOptions(opts):
 
 	return opts	
 
+## execute(deg, pts, opts, preserveShape=False)
 # Computes the value of a dynamic programming problem
 # over T periods, given range [init,end]
+#
+# Inputs: deg           - int, degree of polynomial to use for approximation
+#         pts           - int, number of points to approximate at
+#		  opts          - dict, dictionary of options and parameters
+#         preserveShape - bool, sets whether or not to use shape preservation
+#                         in polynomial approximation
+#
+# Output: (value, policy) tuple, where
+#         value[i][j]  is an array of coefficients for the polynomial approximation
+#                      of the value function in the jth state in time period i
+#         policy[i][j] is an array describing the optimal policy in the jth state
+#                      in time period i
+
 def execute(deg, pts, opts, preserveShape=False):
 
-	##########
-	## Processing options
-	##########
+	########################
+	## I. Processing options
+	########################
 
 	opts = checkOptions(opts)
 
@@ -338,22 +385,29 @@ def execute(deg, pts, opts, preserveShape=False):
 	else:
 		approxshape = approxCheb
 
-	## Set up grid for approximation
+	###########################################
+	## II. Initialize Arrays to store variables
+	###########################################
+
+	# Set up grid for approximation
 	grid = nodes(opts['init'], opts['end'], pts)
 
 	# List of value and policy function approximations
 	value = []
 	policy = []
 
-	## Terminal Period
+	#######################
+	## III. Terminal Period
+	#######################
+
 	# Handle last time period separately due to 
 	# needing to accomodate bequest
-
-	# Initialize final time period value function
 	print "COMPUTING PERIOD", opts['T']-1
 
+	# Initialize final time period value function
 	bequest = [opts['bequest'](x) for x in grid]
 
+	# approximate function with polynomial
 	poly = [approxshape(grid, bequest, opts['init'], opts['end'], deg) for state in opts['states']]
 	value.append(poly)
 
@@ -361,8 +415,10 @@ def execute(deg, pts, opts, preserveShape=False):
 	vi, ui = zip(*[maxim(grid, poly, state=[state, opts['wages'][-1]], opts=opts) for state in opts['states']])
 	policy.append(ui)
 
-	## Iterate back through previous periods
-	# Set T=1 for single period
+	############################################
+	## IV. Iterate back through previous periods
+	############################################
+
 	for t in reversed(range(opts['T'] - 1)):
 		print "\nCOMPUTING PERIOD", t
 
