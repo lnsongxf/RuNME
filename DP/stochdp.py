@@ -2,8 +2,11 @@ import numpy as np
 from scipy import optimize
 import sys
 
-import pulp
 import matplotlib.pyplot as ppt
+
+#from chebfun import *
+
+#import numpy as np
 
 ## Runnan Yang 2013
 ## Solves Life-cycle dynamic programming problems
@@ -11,7 +14,10 @@ import matplotlib.pyplot as ppt
 ## with a Chebyshev polynomial and performing
 ## backwards induction from the final to first period
 
+
+##############################################################
 ## Convenient functions for working with Chebyshev polynomials
+##############################################################
 
 # Computes Chebyshev nodes over interval [init,end]
 def nodes(init, end, deg):
@@ -26,7 +32,7 @@ def unnormalize(x, init, end):
 	return (float(x) + 1.) / (2.) * (end - init) + init
 
 # Evaluates the chebyshev polynomial at point x, after
-# normalizing it to range (-1,1)
+# normalizing x to [-1,1] from [init,end]
 def chebval(x, c, init, end):
 	return np.polynomial.chebyshev.chebval(normalize(x,init,end),c)
 
@@ -37,49 +43,55 @@ def plotpoly(grid, poly, init, end):
 	ppt.plot(grid,vi)
 	ppt.show()
 
+##############################################################
+
+##############################################################
+
+##############################################################
+## Approximation Functions
+##############################################################
+
 # Approximates a function whose values at the points xi
 # are vi, where xi are in range [init,end]
 # Returns a chebyshev polynomial object
 # Status: DONE
 def approx(xi, vi, init, end, deg):
-	# Compress the grid of xi points into [-1,1]
-	normxi = np.array(map(lambda x: normalize(x, init, end), xi))
-
-	# Fits a chebyshev polynomial to these normalized points
-	poly = np.polynomial.chebyshev.chebfit(normxi, vi, deg)
-	#poly = np.polynomial.chebyshev.Chebyshev.fit(xi, vi, deg, domain=[init,end])
-	return poly
+	return np.polynomial.chebyshev.Chebyshev.fit(xi, vi, deg, domain=[init,end])
 
 # Approximates a function whose values at the points xi
-# are vi, where xi are in range [init, end]
+# are vi, where xi are in range [init, end], while
+# ensuring that the function is monotonic increasing and
+# concave
 # 
-# Return a chebyshev polynomial object
-# Status: IN PROGRESS
-def approxshape(xi, vi, init, end, deg, shapePts=None):
+# Return a set of coefficients for a 
+# Chebyshev polynomial
+# Status: DONE
+
+# Set up the following minimization problem 
+# min_{c_j} \sum_{j=0}^n (c_j T_j(x_i) - v_i)**2
+# s.t. \sum_{j=0}^n c_j T'_j(y_i) > 0 for i in (1,m') # monotonicity
+#      \sum_{j=0}^n c_j T''_j(y_i) < 0 for i in (1,m') # concavity
+# where the points y_i are shapePts, and the points x_i
+# are the chebyshev interpolation nodes
+
+# Note: I use a number of nested list comprehensions in this
+# function, since they are well-optimized in Python, at the risk
+# of loss of clarity
+
+def approxshape(xi, vi, init, end, deg, shapeGrid=None):
 	n = deg + 1
 
-	if shapePts == None:
-		# Generate points at which to enforce shape
-		# uniformly on (init,end)
+	# If grid of shape-preservation points not supplied,
+	# generate points uniformly on [init,end]
+	if shapeGrid == None:
 		shapeGrid = np.arange(init, end, 0.1)
-	else:
-		shapeGrid = shapePts
+		
+	# We will need to first compute T'_j(y_i), T''_j(y_i), and T_j(z_i)
+	# given these values, we can set up the constraints for the
+	# optimization problem
 
-	# Set up linear programming problem as described in 
-	# Judd Cai 2011 "Shape-Preserving Dynamic Programming"
-	# min_{c_j} \sum_{j=0}^n (1/(j+1)^2) (c_j^+ + c_j^-)
-	# s.t. \sum_{j=0}^n c_j T'_j(y_i) > 0 for i in (1,m') # monotonicity
-	#      \sum_{j=0}^n c_j T''_j(y_i) < 0 for i in (1,m') # concavity
-	#      \sum_{j=0}^n c_j T_j(z_i) = v_i for i in (1,m) # concavity
-	#      c_j = c_j^+ + c_j^-
-	#      c_j^+ >= 0, c_j^- >= 0
-	# where the points y_i are shapePts, the points z_i are xi, v_i is vi
-
-	# we will need to first compute T'_j(y_i), T''_j(y_i), and T_j(z_i)
-	# given these values, we can set up the linear programming problem
-
-	# Create a chebyshev polynomial of degree deg
-	# Compute the basis polynomials
+	# Compute the basis polynomials and the first
+	# and second derivatives
 	Tj = [np.polynomial.chebyshev.Chebyshev.basis(i, domain=[0,10]) for i in range(0,n+1)]
 	Tjd = [p.deriv() for p in Tj]
 	Tjdd = [p.deriv(2) for p in Tj]
@@ -89,74 +101,56 @@ def approxshape(xi, vi, init, end, deg, shapePts=None):
 	Tjyd = [[chebval(shapeGrid[i], p.coef, init, end) for p in Tjd] for i in range(len(shapeGrid))]
 	Tjydd = [[chebval(shapeGrid[i], p.coef, init, end) for p in Tjdd] for i in range(len(shapeGrid))]
 
+	## Initial Guess
 	# Run initial pass with coefficients from
 	# fitting without shape preservation
+
+	# Observation: in cases where this function is relevant,
+	# this polynomial will NOT obey the shape constraints
+	# will it be an issue that the shape constraints are
+	# violated by the initial guess, or is it more important
+	# that the initial guess is good?
 	poly0 = approx(xi, vi, init, end, deg)
+	
+	## Set up objective function for minimization problem
 
-	# Set up minimization problem
-
+	# Minimize sum of squared errors
 	def obj(c):
-		#minimize least squared errors
+		return sum([(sum([Tjx[i][j] * c[j] for j in range(n)]) - vi[i])**2. for i in range(len(xi))])
 
-		# c is a list of weights on the 
-		# corresponding degree j of c[j]
+	## Define constraints
 
-		# compute estimate and subtract 
-		sumse = 0.
-		#print len(xi), n
-		for i in range(len(xi)):
-			est = 0.
-			for j in range(n):
-				est += Tjx[i][j] * c[j]
-			sumse += (est - vi[i])**2.
+	# returns an array where each element
+	# must be >= 0
+	def cons(c):
+		constraints = np.zeros(2*len(shapeGrid))
 
-		return sumse
+		# Monotonocity
+		constraints[0:len(shapeGrid)] = [sum([Tjyd[i][j] * c[j] for j in range(n)]) for i in range(len(shapeGrid))]
 
-	#print obj([2.058001,1.2780141,-0.2078,0.0752])
+		# Concavity
+		constraints[len(shapeGrid):2*len(shapeGrid)] = [sum([-Tjydd[i][j] * c[j] for j in range(n)]) for i in range(len(shapeGrid))]
 
-	# define constraints
+		return constraints
 
-	# Monotonocity
-	# return an array where each element
-	# should be > 0
-	def monoCons(c):
-		# for each point
-		s = np.zeros(len(shapeGrid))
-		for i in range(len(shapeGrid)):
-			est = 0.
-			# for each degree
-			for j in range(n):
-				#print Tjyd[i]
-				est += Tjyd[i][j] * c[j]
-			s[i] = est
-		return s
+	# Solve Optimization Problem
+	res = optimize.fmin_slsqp(func=obj, x0=poly0.coef, f_ieqcons=cons, iprint=0, full_output=1)
 
-	# Concavity
-	# returns an array where each element 
-	# should be > 0
-	def concCons(c):
-		s = np.zeros(len(shapeGrid))
-		for i in range(len(shapeGrid)):
-			est = 0.
-			for j in range(n):
-				est -= Tjydd[i][j] * c[j]
-			s[i] = est
-		return s
+	# Check optimization status
+	if res[3] != 0:
+		print "OPTIMIZATION FAILED"
+		print res[4] # String describing exit status
+		sys.exit()
 
-	def constraint(c):
-		#print c
-		out = np.zeros(2*len(shapeGrid))
-		out[0:len(shapeGrid)] = monoCons(c)
-		out[len(shapeGrid):2*len(shapeGrid)] = concCons(c)
+	return res[0]
 
-		return out
-	#print "poly0", poly0
-	res = optimize.fmin_slsqp(func=obj, x0=poly0, f_ieqcons=constraint)
-	return res
+##############################################################
 
-grid = np.arange(0.1,10,0.01)
-#print approx(xi=grid, vi=grid**0.5, init=0.1, end=10, deg=3)
-#p = approxshape(xi=grid, vi=grid**0.5, init=0.1, end=10, deg=3)
+##############################################################
+
+##############################################################
+## Maximization Functions
+##############################################################
 
 # Compute the maximum at each point in xi given that vt
 # is a chebyshev polynomial which approximates the
@@ -167,42 +161,49 @@ grid = np.arange(0.1,10,0.01)
 # vt[1] approximates the mean state in next period
 # vt[2] approximates the low  state in next period
 
-def maxim(xi, vt, init, end, state=1, wages=None):
-	print "STATE",state
+def maxim(xi, vt, init, end, utility=None, state=1, wage=0):
+	# print "STATE",state
+
+	# Initialize arrays
 	n = len(xi)
 	vi = np.zeros(n)
 	u = np.zeros((n,2))
+
 	beta = 0.9
-	if wages == None:
-		w = 0.
-	else:
-		w = wages
 
 	mTrans = np.zeros((3,3))
-	mTrans[0,:] = [0.5,0.4,0.1]
+	mTrans[0,:] = [0.75,0.2,0.05]
 	mTrans[1,:] = [0.25,.5,.25]
-	mTrans[2,:] = [0.1,0.4,0.5]	
+	mTrans[2,:] = [0.05,0.2,0.75]
 
 	# Stochastic Wages States
 	if state == 0:
-		w = w * 0.9
+		wage = wage * 0.9
 	elif state == 1:
-		w = w * 1
+		wage = wage * 1
 	elif state == 2:
-		w = w * 1.2
+		wage = wage * 1.1
 
-	def utility(k1, l, k0):
-		# Make sure we don't accidentally try to take
-		# the square root of a negative
-		if l >= 1:
-			return -1
-		if k0**0.33 + (0.9 * k0) - k1 + (w * l) < 0:
-			return -1
+	#####
+	# the utility function supplied should
+	# take two arguments, x and k0
+	# where x is a k-length array of the controls
+	# and k0 is the single state variable
+	#
+	# for example, if we were solving a problem
+	# where an agent chooses savings and labor,
+	# we might let x[0] = k_{t+1} and x[1] = l
+	#####
 
-		return (k0**0.33 + (0.9 * k0) - k1 + (w * l))**0.5 + (1. - l)**0.5
+
+
+	if utility == None:
+		print "ERROR: No Utility Function Supplied"
+		print "Exiting function"
+		sys.exit()
 
 	def obj(k1,k0):
-		curr = utility(k1[0],k1[1],k0)
+		curr = utility(k1,[k0,wage])
 
 		# call value function approximation for
 		# continuation value
@@ -219,8 +220,10 @@ def maxim(xi, vt, init, end, state=1, wages=None):
 
 	for i in xrange(len(xi)):
 		k0 = xi[i]
-		kmin = 0 # no borrowing
-		kmax = k0**0.33 + (1. - 0.1) * k0 + w
+		# no borrowing
+		kmin = 0 
+		# max possible savings given l=1
+		kmax = k0**0.33 + (1. - 0.1) * k0 + wage
 
 		# initial guess: midpoint of max and min, work 1/2
 		x0 = np.array([(k0**0.33 + 0.9*k0) / 2.,0.5])
@@ -230,7 +233,7 @@ def maxim(xi, vt, init, end, state=1, wages=None):
 
 		cons = {}
 		cons['type'] = 'ineq'
-		cons['fun'] = lambda x: k0**0.5 + 0.9*k0 + w*x[1] - x[0]
+		cons['fun'] = lambda x: k0**0.5 + 0.9*k0 + wage*x[1] - x[0]
 
 		options = {}
 		options['maxiter'] = 1000
@@ -247,7 +250,7 @@ def maxim(xi, vt, init, end, state=1, wages=None):
 
 		# Check optimization status
 		if res.success == False:
-			# If optimization fails, freak out and die
+			# If optimization fails, shut down
 			print xi[i], k0
 			print res
 			sys.exit()
@@ -256,35 +259,20 @@ def maxim(xi, vt, init, end, state=1, wages=None):
 		vi[i] = -obj(res.x, k0)
 		u[i,:] = res.x
 
-		print k0, np.round(res.x[0],5), np.round(res.x[1],5), -obj(res.x, k0)
+		#print k0, np.round(res.x[0],5), np.round(res.x[1],5), -obj(res.x, k0)
 
 	return vi
 
 # Computes the value of a dynamic programming problem
 # over T periods, given range [init,end]
-def execute(init, end, deg, pts, T, preserveShape=False):
+def execute(init, end, deg, pts, T, preserveShape=False, utility=None, wages=None):
 	# initialize grid
 	grid = nodes(init, end, pts)
 
-	# Extension: wages changing over time
-	# Case 1: deterministic wages
-	# Wages rise in the early period, remain high in the second period
-	# and declines in the third period
-	wages = np.zeros(T)
-	period = int(np.floor(T/3.))
-	if period == 0:
-		print "Too few periods - setting constant wages"
-		wages[:] = 5
-	else:
-		for i in xrange(period+1):
-			wages[i] = i * (5. / period)# growing up to 5
-		wages[period:2*period] = 5.
-		for i in xrange(2*period,T):
-			wages[i] = 5. - 2. * (i - 2.*period) / (T - 2.*period)
-	#wages = np.zeros(T)
+	states = [0,1,2]
 
-	# Extension: wages that move through different states
-	# Status: 3 state model done
+	if wages==None:
+		wages = np.zeros(T)
 
 	# we will save each of the value function approximation
 	# polynomials in rec
@@ -296,45 +284,92 @@ def execute(init, end, deg, pts, T, preserveShape=False):
 	# Initialize final time period value function
 	# (no states in final period)
 	print "PERIOD", T-1
-	poly = []
-	poly.append(approxshape(grid, grid**0.5, init, end, deg))
-	poly.append(approxshape(grid, grid**0.5, init, end, deg))
-	poly.append(approxshape(grid, grid**0.5, init, end, deg))
-	
+
+	poly = [approxshape(grid, grid**0.5, init, end, deg) for state in states]
 	rec.append(poly)
-	# compute second to last period value function points	
-	vi = []
-	vi.append(maxim(grid, poly, init, end, state=0, wages=wages[-1]))
-	vi.append(maxim(grid, poly, init, end, state=1, wages=wages[-1]))
-	vi.append(maxim(grid, poly, init, end, state=2, wages=wages[-1]))
+
+	# compute second to last period value function points
+	vi = [maxim(grid, poly, init, end, utility=utility, state=state, wage=wages[-1]) for state in states]
 
 	## Iterate back through previous periods
 	# Set T=1 for single period
 	for t in reversed(range(T - 1)):
 		print "\nPERIOD", t
+
 		# approximate next period value function
-		poly[0] = approxshape(grid, vi[0], init, end, deg)
-		poly[1] = approxshape(grid, vi[1], init, end, deg)
-		poly[2] = approxshape(grid, vi[2], init, end, deg)
+		poly = [approxshape(grid, vi[state], init, end, deg) for state in states]
 		rec.append(poly)
 
 		# solve for value function at points
-		vi[0] = maxim(grid, poly, init, end, state=0, wages=wages[t])
-		vi[1] = maxim(grid, poly, init, end, state=1, wages=wages[t])
-		vi[2] = maxim(grid, poly, init, end, state=2, wages=wages[t])
+		vi = [maxim(grid, poly, init, end, utility=utility, state=state, wage=wages[t]) for state in states]
 
 	# Approximate final polynomial (for first period)
-	poly[0] = approxshape(grid, vi[0], init, end, deg)
-	poly[1] = approxshape(grid, vi[1], init, end, deg)
-	poly[2] = approxshape(grid, vi[2], init, end, deg)
+	poly = [approxshape(grid, vi[state], init, end, deg) for state in states]
 	rec.append(poly)
 
+	# Reverse our record of the polynomial approximations
+	# so that rec[i] = value function for period i
+	# and rec[T] = function for bequeath motive
 	rec.reverse()
-	# rec[i] = value function for period i
-	# from 0 through T (period T = bequeath)
 
 	return rec
 
 # Just some code to test my useful functions
 
-r = execute(init=0.1, end=10., deg = 10, pts=40, T=1)
+def utilityDefault(x, y):
+
+	k1 = x[0]
+	l = x[1]
+
+	k0 = y[0]
+	w = y[1]
+
+	# Make sure we don't try to take
+	# the square root of a negative
+	# (the other bounds can be handled
+	#  by the optimizer)
+	if l >= 1:
+		return -1
+	if k0**0.33 + (0.9 * k0) - k1 + (w * l) < 0:
+		return -1
+
+	return (k0**0.33 + (0.9 * k0) - k1 + (w * l))**0.5 + (1. - l)**0.5
+
+T = 5
+
+wages = np.zeros(T)
+period = int(np.floor(T/3.))
+if period == 0:
+	print "Too few periods - setting constant wages"
+	wages[:] = 5
+else:
+	for i in xrange(period+1):
+		wages[i] = i * (5. / period)# growing up to 5
+	wages[period:2*period] = 5.
+	for i in xrange(2*period,T):
+		wages[i] = 5. - 2. * (i - 2.*period) / (T - 2.*period)
+
+r = execute(init=0.1, end=10., deg = 5, pts=40, T=5, utility=utilityDefault, wages=wages)
+
+# two periods with labor choice
+# analytic soln
+
+grid = np.arange(0.1,10,0.01)
+
+income = lambda k0: k0**0.33 + 0.9 * k0
+labor = lambda k0: (25. + 0.81*25. - income(k0)) / (5. + 25. + 25. * 0.81)
+c1 = lambda k0: 25. * (1. - labor(k0))
+c2 = lambda k0: 0.81 * c1(k0)
+u = lambda k0: c1(k0)**0.5 + 0.9 * c2(k0)**0.5 + (1.-labor(k0))**0.5
+
+grid = np.arange(0.1,10,0.01)
+yactual = map(u, grid)
+yapprox = map(lambda x: chebval(x, r[0][0], 0.1, 10), grid)
+yapprox1 = map(lambda x: chebval(x, r[0][1], 0.1, 10), grid)
+yapprox2 = map(lambda x: chebval(x, r[0][2], 0.1, 10), grid)
+ppt.clf()
+ppt.plot(grid,yapprox1)
+ppt.plot(grid,yapprox)
+ppt.plot(grid,yapprox2)
+ppt.plot(grid,yactual,'k')
+ppt.show()
