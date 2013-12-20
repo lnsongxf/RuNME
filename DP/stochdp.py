@@ -262,7 +262,9 @@ def maxim(xi, vt, state=[0,0], opts=None):
 # over T periods, given range [init,end]
 def execute(deg, pts, opts, preserveShape=False):
 
-	# Processing options
+	##########
+	## Processing options
+	##########
 
 	#####
 	# the utility function supplied should
@@ -275,40 +277,50 @@ def execute(deg, pts, opts, preserveShape=False):
 	# we might let x[0] = k_{t+1} and x[1] = l
 	#####
 
-	# Big list of assertions about our
-	# options dictionary
+	# Assertions about our options dictionary
+	# for items where there is no default value
 
 	assert 'utility' in opts, "No Utility Function Specified"
 	assert 'bequest' in opts, "No Value for Final Period Specified"
+	assert 'production' in opts, "No Production Function Specified"
+
+	assert 'beta' in opts, "No beta value Specified"
+	assert 'T' in opts, "No number of periods Specified"
+
 	assert 'init' in opts, "No initial value for Range"
 	assert 'end' in opts, "No final value for Range"
 
-	init = opts['init']
-	end = opts['end']
+	# Variables with default values if not supplied
 
 	opts['states'] = opts['states'] if 'states' in opts else [0]
 	opts['wages'] = opts['wages'] if 'wages' in opts else np.zeros(T)
+	opts['trans'] = opts['trans'] if 'trans' in opts else np.ones(1)
 
-	# initialize grid
-	grid = nodes(opts['init'], opts['end'], pts)
+	assert np.array(opts['trans']).shape == (len(opts['states']), len(opts['states'])), "Transition matrix malformed."
+	assert len(opts['wages']) == T, "Wages malformed"
 
+	## Shape-Preservation Option
 	# Choose whether to try to preserve shape during the
-	# chebyshev approximation step
+	# chebyshev approximation step, i.e. which
+	# approximation function to call
 	if preserveShape:
 		approxshape = approxChebshape
 	else:
 		approxshape = approxCheb
 
-	# we will save each of the value function approximation
-	# polynomials in rec
+	## Set up grid for approximation
+	grid = nodes(opts['init'], opts['end'], pts)
+
+	# List of value and policy function approximations
 	value = []
 	policy = []
 
-	## Handle last time period separately due to 
-	# different final value
+	## Terminal Period
+	# Handle last time period separately due to 
+	# needing to accomodate bequest
 
 	# Initialize final time period value function
-	print "PERIOD", opts['T']-1
+	print "COMPUTING PERIOD", opts['T']-1
 
 	bequest = [opts['bequest'](x) for x in grid]
 
@@ -316,24 +328,20 @@ def execute(deg, pts, opts, preserveShape=False):
 	value.append(poly)
 
 	# compute second to last period value function points
-	vi = [maxim(grid, poly, state=[state, wages[-1]], opts=opts) for state in opts['states']]
-	ui = [vi[state][1] for state in opts['states']]
-	vi = [vi[state][0] for state in opts['states']]
+	vi, ui = zip(*[maxim(grid, poly, state=[state, wages[-1]], opts=opts) for state in opts['states']])
 	policy.append(ui)
 
 	## Iterate back through previous periods
 	# Set T=1 for single period
 	for t in reversed(range(opts['T'] - 1)):
-		print "\nPERIOD", t
+		#print "\nCOMPUTING PERIOD", t
 
 		# approximate next period value function
 		poly = [approxshape(grid, vi[state], opts['init'], opts['end'], deg) for state in opts['states']]
 		value.append(poly)
 
 		# solve for value function at points
-		vi = [maxim(grid, poly, state=[state, wages[t]], opts=opts) for state in opts['states']]
-		ui = [vi[state][1] for state in opts['states']]
-		vi = [vi[state][0] for state in opts['states']]
+		vi, ui = zip(*[maxim(grid, poly, state=[state, wages[t]], opts=opts) for state in opts['states']])
 		policy.append(ui)
 
 	# Approximate final polynomial (for first period)
@@ -401,15 +409,21 @@ opts = {}
 
 ## Model Parameters
 
-opts['init'] = 0.1
-opts['end'] = 10.
-opts['wages'] = wages
+# Utility and Production Functions
 opts['utility'] = utilityDefault
 opts['bequest'] = bequestValue
 opts['production'] = productionDefault
-opts['T'] = T
-opts['states'] = [0,1,2]
 opts['beta'] = 0.9
+
+# Mean wages over time
+opts['wages'] = wages
+
+# Number of periods
+opts['T'] = T
+
+# Number states describing
+# change in wages
+opts['states'] = [0,1,2]
 opts['trans'] = mTrans
 
 ## Optimization Parameters
@@ -424,7 +438,7 @@ opts['init'] = 0.1
 opts['end'] = 10.
 
 ## Execute the solver
-r = execute(deg = 5, pts=40, opts=opts)
+r = execute(deg = 5, pts=100, opts=opts)[0]
 #r2 = execute(deg = 5, pts=40, opts=opts, preserveShape=True)
 
 # two periods with labor choice
@@ -439,10 +453,10 @@ c2 = lambda k0: 0.81 * c1(k0)
 u = lambda k0: c1(k0)**0.5 + 0.9 * c2(k0)**0.5 + (1.-labor(k0))**0.5
 
 grid = np.arange(0.1,10,0.01)
-grid = nodes(0.1,10,40)
-yactual = map(u, grid)
+# grid = nodes(0.1,10,40)
+# yactual = map(u, grid)
 # yapprox = map(lambda x: chebval(x, r[0][0], 0.1, 10), grid)
-# yapprox1 = map(lambda x: chebval(x, r[0][1], 0.1, 10), grid)
+yapprox1 = map(lambda x: chebval(x, r[0][1], 0.1, 10), grid)
 # yapprox2 = map(lambda x: chebval(x, r[0][2], 0.1, 10), grid)
 
 # yapproxs = map(lambda x: chebval(x, r2[0][0], 0.1, 10), grid)
@@ -459,8 +473,13 @@ yactual = map(u, grid)
 
 # print len(grid), len(yapprox1)
 
-# ppt.clf()
-# ppt.plot(grid,yapprox1)
+ppt.clf()
+ppt.plot(grid,yapprox1)
+ppt.axis([0,10,0,20])
+ppt.xlabel('k0')
+ppt.ylabel('v')
+ppt.savefig('myplot')
+
 # ppt.plot(grid,yapprox)
 # ppt.plot(grid,yapprox2)
 
