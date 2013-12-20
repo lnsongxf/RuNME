@@ -109,11 +109,12 @@ def approxChebshape(xi, vi, init, end, deg, shapeGrid=None):
 	# Run initial pass with coefficients from
 	# fitting without shape preservation
 
-	# Observation: in cases where this function is relevant,
+	# Note: in cases where this function is relevant,
 	# this polynomial will NOT obey the shape constraints
 	# will it be an issue that the shape constraints are
 	# violated by the initial guess, or is it more important
 	# that the initial guess is good?
+
 	poly0 = approxCheb(xi, vi, init, end, deg)
 	
 	## Set up objective function for minimization problem
@@ -138,7 +139,11 @@ def approxChebshape(xi, vi, init, end, deg, shapeGrid=None):
 		return constraints
 
 	# Solve Optimization Problem
-	res = optimize.fmin_slsqp(func=obj, x0=poly0, f_ieqcons=cons, iprint=0, full_output=1)
+	res = optimize.fmin_slsqp(func=obj, 
+							  x0=poly0, 
+							  f_ieqcons=cons, 
+							  iprint=0, 
+							  full_output=1)
 
 	# Check optimization status
 	if res[3] != 0:
@@ -165,21 +170,24 @@ def approxChebshape(xi, vi, init, end, deg, shapeGrid=None):
 # vt[1] approximates the mean state in next period
 # vt[2] approximates the low  state in next period
 
-def maxim(xi, vt, init, end, utility=None, beta=1, state=1, wage=0, opts=None):
-	# print "STATE",state
+def maxim(xi, vt, state=[0,0], opts=None):
+
+	assert 'utility' in opts, "No Utility Function Specified"
+	assert 'production' in opts, "No Production Function Specified"
+
+	wage = state[1]
+	state = state[0]
 
 	# Initialize arrays
-	n = len(xi)
-	vi = np.zeros(n)
-	u = np.zeros((n,2))
+	n = len(xi)          # num grid points
+	vi = np.zeros(n)     # value
+	ui = np.zeros((n,2)) # policy
 
-	mTrans = np.zeros((3,3))
-	mTrans[0,:] = [0.75,0.2,0.05]
-	mTrans[1,:] = [0.25,.5,.25]
-	mTrans[2,:] = [0.05,0.2,0.75]
+	# Transition matrix between states
+	opts['trans'] = opts['trans'] if 'trans' in opts else np.ones(1)
 
 	# Stochastic Wages States
-
+	# computes the wage given the current state
 	def statewage(state, wage):
 		if state == 0:
 			return wage * 0.9
@@ -190,30 +198,27 @@ def maxim(xi, vt, init, end, utility=None, beta=1, state=1, wage=0, opts=None):
 
 	wage = statewage(state, wage)
 
-	def production(k0):
-		return k0 ** 0.5 + (1 - 0.1) * k0
-
+	
 	def obj(k1,k0):
-		curr = utility(k1,[k0,wage])
-
-		states = [0,1,2]
+		# compute current period
+		curr = opts['utility'](k1,[k0,wage])
 
 		# call value function approximation for
 		# continuation value
-		cont = [chebval(k1[0],vt[s],init,end) for s in states]
+		cont = [chebval(k1[0],vt[s],opts['init'],opts['end']) for s in opts['states']]
 
 		# and then take the conditional mean of the value function
 		# at each state
 		cont = mTrans[state,:].dot(cont)
 
-		return -(curr + beta * cont)
+		return -(curr + opts['beta'] * cont)
 
 	for i in xrange(len(xi)):
 		k0 = xi[i]
 		# no borrowing
 		kmin = 0 
 		# max possible savings given l=1
-		kmax = production(k0) + wage
+		kmax = opts['production'](k0,0) + wage
 
 		lmin = 0
 		lmax = 1
@@ -222,19 +227,11 @@ def maxim(xi, vt, init, end, utility=None, beta=1, state=1, wage=0, opts=None):
 		# Note: can we guarantee within constraints?
 		x0 = np.array([(kmin + kmax) / 2.,(lmin + lmax) / 2.])
 
-		# set constraints
-		# k1 < f(k0) + w*l
-
-		#cons = {}
-		#cons['type'] = 'ineq'
-		#cons['fun'] = lambda x: production(k0) + wage*x[1] - x[0]
-
 		options = {'maxiter':1000}
 
 		res = optimize.minimize(fun=lambda x: obj(x,k0), 
 								x0=x0,
 								method="SLSQP",
-								#constraints=cons,
 								bounds=((kmin,kmax),(lmin, lmax)),
 								options=options)
 
@@ -247,27 +244,25 @@ def maxim(xi, vt, init, end, utility=None, beta=1, state=1, wage=0, opts=None):
 
 		# compute the value of the optimal policy
 		vi[i] = -obj(res.x, k0)
-		u[i,:] = res.x
+		ui[i,:] = res.x
 
 		#print k0, np.round(res.x[0],5), np.round(res.x[1],5), -obj(res.x, k0)
 
-	return [vi,u]
+	return [vi,ui]
+
+##############################################################
+
+##############################################################
+
+##############################################################
+## Maximization Functions
+##############################################################
 
 # Computes the value of a dynamic programming problem
 # over T periods, given range [init,end]
-def execute(init, end, deg, pts, preserveShape=False, opts=None):
-	# initialize grid
-	grid = nodes(init, end, pts)
+def execute(deg, pts, opts, preserveShape=False):
 
-	try:
-		states = opts['states']
-	except:
-		states = [0]
-
-	try:
-		wages = opts['wages']
-	except:
-		wages = np.zeros(T)
+	# Processing options
 
 	#####
 	# the utility function supplied should
@@ -280,12 +275,22 @@ def execute(init, end, deg, pts, preserveShape=False, opts=None):
 	# we might let x[0] = k_{t+1} and x[1] = l
 	#####
 
-	try:
-		utility=opts['utility']
-	except:
-		print "No Utility Function Supplied"
-		print "Exiting function"
-		return 0
+	# Big list of assertions about our
+	# options dictionary
+
+	assert 'utility' in opts, "No Utility Function Specified"
+	assert 'bequest' in opts, "No Value for Final Period Specified"
+	assert 'init' in opts, "No initial value for Range"
+	assert 'end' in opts, "No final value for Range"
+
+	init = opts['init']
+	end = opts['end']
+
+	opts['states'] = opts['states'] if 'states' in opts else [0]
+	opts['wages'] = opts['wages'] if 'wages' in opts else np.zeros(T)
+
+	# initialize grid
+	grid = nodes(opts['init'], opts['end'], pts)
 
 	# Choose whether to try to preserve shape during the
 	# chebyshev approximation step
@@ -296,8 +301,7 @@ def execute(init, end, deg, pts, preserveShape=False, opts=None):
 
 	# we will save each of the value function approximation
 	# polynomials in rec
-	rec = []
-
+	value = []
 	policy = []
 
 	## Handle last time period separately due to 
@@ -308,13 +312,13 @@ def execute(init, end, deg, pts, preserveShape=False, opts=None):
 
 	bequest = [opts['bequest'](x) for x in grid]
 
-	poly = [approxshape(grid, bequest, init, end, deg) for state in states]
-	rec.append(poly)
+	poly = [approxshape(grid, bequest, opts['init'], opts['end'], deg) for state in opts['states']]
+	value.append(poly)
 
 	# compute second to last period value function points
-	vi = [maxim(grid, poly, init, end, utility=utility, beta = opts['beta'], state=state, wage=wages[-1]) for state in states]
-	ui = [vi[state][1] for state in states]
-	vi = [vi[state][0] for state in states]
+	vi = [maxim(grid, poly, state=[state, wages[-1]], opts=opts) for state in opts['states']]
+	ui = [vi[state][1] for state in opts['states']]
+	vi = [vi[state][0] for state in opts['states']]
 	policy.append(ui)
 
 	## Iterate back through previous periods
@@ -323,28 +327,33 @@ def execute(init, end, deg, pts, preserveShape=False, opts=None):
 		print "\nPERIOD", t
 
 		# approximate next period value function
-		poly = [approxshape(grid, vi[state], init, end, deg) for state in states]
-		rec.append(poly)
+		poly = [approxshape(grid, vi[state], opts['init'], opts['end'], deg) for state in opts['states']]
+		value.append(poly)
 
 		# solve for value function at points
-		vi = [maxim(grid, poly, init, end, utility=utility, beta = opts['beta'], state=state, wage=wages[t]) for state in states]
-		ui = [vi[state][1] for state in states]
-		vi = [vi[state][0] for state in states]
+		vi = [maxim(grid, poly, state=[state, wages[t]], opts=opts) for state in opts['states']]
+		ui = [vi[state][1] for state in opts['states']]
+		vi = [vi[state][0] for state in opts['states']]
 		policy.append(ui)
 
 	# Approximate final polynomial (for first period)
-	poly = [approxshape(grid, vi[state], init, end, deg) for state in states]
-	rec.append(poly)
+	poly = [approxshape(grid, vi[state], opts['init'], opts['end'], deg) for state in opts['states']]
+	value.append(poly)
 
 	# Reverse our record of the polynomial approximations
 	# so that rec[i] = value function for period i
 	# and rec[T] = function for bequeath motive
-	rec.reverse()
+	value.reverse()
+	policy.reverse()
 
-	return policy#rec
+	# Note: value here is a list of coefficients, 
+	# policy is a list of values at each grid pt
+	return (value, policy)
 
 # Just some code to test my useful functions
 
+# x - controls
+# y - state variables
 def utilityDefault(x, y):
 
 	k1 = x[0]
@@ -355,8 +364,6 @@ def utilityDefault(x, y):
 
 	# Make sure we don't try to take
 	# the square root of a negative
-	# (the other bounds can be handled
-	#  by the optimizer)
 
 	if l >= 1:
 		return -1
@@ -368,7 +375,10 @@ def utilityDefault(x, y):
 def bequestValue(x):
 	return x**0.5
 
-T = 60
+def productionDefault(k0, l):
+		return k0 ** 0.5 + (1 - 0.1) * k0
+
+T = 10
 
 wages = np.zeros(T)
 period = int(np.floor(T/3.))
@@ -382,6 +392,11 @@ else:
 	for i in xrange(2*period,T):
 		wages[i] = 5. - 2. * (i - 2.*period) / (T - 2.*period)
 
+mTrans = np.zeros((3,3))
+mTrans[0,:] = [0.75,0.2,0.05]
+mTrans[1,:] = [0.25,.5,.25]
+mTrans[2,:] = [0.05,0.2,0.75]
+
 opts = {}
 
 ## Model Parameters
@@ -391,9 +406,11 @@ opts['end'] = 10.
 opts['wages'] = wages
 opts['utility'] = utilityDefault
 opts['bequest'] = bequestValue
-opts['T'] = 60
+opts['production'] = productionDefault
+opts['T'] = T
 opts['states'] = [0,1,2]
 opts['beta'] = 0.9
+opts['trans'] = mTrans
 
 ## Optimization Parameters
 
@@ -407,8 +424,8 @@ opts['init'] = 0.1
 opts['end'] = 10.
 
 ## Execute the solver
-r = execute(init=0.1, end=10., deg = 5, pts=40, opts=opts)
-r2 = execute(init=0.1, end=10., deg = 5, pts=40, opts=opts, preserveShape=True)
+r = execute(deg = 5, pts=40, opts=opts)
+#r2 = execute(deg = 5, pts=40, opts=opts, preserveShape=True)
 
 # two periods with labor choice
 # analytic soln
@@ -432,24 +449,24 @@ yactual = map(u, grid)
 # yapprox1s = map(lambda x: chebval(x, r2[0][1], 0.1, 10), grid)
 # yapprox2s = map(lambda x: chebval(x, r2[0][2], 0.1, 10), grid)
 
-yapprox = r[0][1]
-yapprox1 = r[30][1]
-yapprox2 = r[59][1]
+# yapprox = r[0][1]
+# yapprox1 = r[30][1]
+# yapprox2 = r[59][1]
 
-yapproxs = r2[0][1]
-yapprox1s = r2[30][1]
-yapprox2s = r2[59][1]
+# yapproxs = r2[0][1]
+# yapprox1s = r2[30][1]
+# yapprox2s = r2[59][1]
 
-print len(grid), len(yapprox1)
+# print len(grid), len(yapprox1)
 
-ppt.clf()
-ppt.plot(grid,yapprox1)
-ppt.plot(grid,yapprox)
-ppt.plot(grid,yapprox2)
+# ppt.clf()
+# ppt.plot(grid,yapprox1)
+# ppt.plot(grid,yapprox)
+# ppt.plot(grid,yapprox2)
 
-ppt.plot(grid,yapprox1s)
-ppt.plot(grid,yapproxs)
-ppt.plot(grid,yapprox2s)
+# ppt.plot(grid,yapprox1s)
+# ppt.plot(grid,yapproxs)
+# ppt.plot(grid,yapprox2s)
 
-# ppt.plot(grid,yactual,'k')
-ppt.show()
+# # ppt.plot(grid,yactual,'k')
+# ppt.show()
