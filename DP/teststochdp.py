@@ -4,10 +4,17 @@ from stochdp import *
 import numpy as np
 import matplotlib.pyplot as ppt
 
-# Just some code to test my useful functions
+## Sample runs of functions provided in
+## module stochdp.py
+
+##############################################
+# Case 1.
+# One period with bequest, no labor (wages=0),
+# where u(c_1, b) = c_1^0.5 + 0.9 * b^0.5
+##############################################
 
 #####
-# the utility function supplied should
+# Note: the utility function supplied should
 # take two arguments, x and k0
 # where x is a k-length array of the controls
 # and k0 is the single state variable
@@ -20,57 +27,22 @@ import matplotlib.pyplot as ppt
 # x - controls
 # y - state variables
 def utilityDefault(x, y):
+	k1, l = x
+	k0, w = y
 
-	k1 = x[0]
-	l = x[1]
-
-	k0 = y[0]
-	w = y[1]
-
-	# Make sure we don't try to take
-	# the square root of a negative
-
-	if l >= 1:
-		return -1
-	if k0**0.33 + (0.9 * k0) - k1 + (w * l) < 0:
+	if l >= 1 or k0**0.33 + (0.9 * k0) - k1< 0:
 		return -1
 
-	return (k0**0.33 + (0.9 * k0) - k1 + (w * l))**0.5 + (1. - l)**0.5
+	return (k0**0.33 + (0.9 * k0) - k1 + (w * l))**0.5
 
-def bequestValue(x):
+def bequestValueDefault(x):
 	return x**0.5
 
 def productionDefault(k0, l):
-		return k0 ** 0.5 + (1 - 0.1) * k0
+	return k0 ** 0.5 + (1 - 0.1) * k0
 
-T = 10
-
-wages = np.zeros(T)
-period = int(np.floor(T/3.))
-if period == 0:
-	print "Too few periods - setting constant wages"
-	wages[:] = 5
-else:
-	for i in xrange(period+1):
-		wages[i] = i * (5. / period)# growing up to 5
-	wages[period:2*period] = 5.
-	for i in xrange(2*period,T):
-		wages[i] = 5. - 2. * (i - 2.*period) / (T - 2.*period)
-
-mTrans = np.zeros((3,3))
-mTrans[0,:] = [0.75,0.2,0.05]
-mTrans[1,:] = [0.25,.5,.25]
-mTrans[2,:] = [0.05,0.2,0.75]
-
-# Stochastic Wages States
-# computes the wage given the current state
-def statewage(state, wage):
-	if state == 0:
-		return wage * 0.9
-	elif state == 1:
-		return wage * 1
-	elif state == 2:
-		return wage * 1.1
+def statewageDefault(state, wage):
+	return wage
 
 opts = {}
 
@@ -78,20 +50,21 @@ opts = {}
 
 # Utility and Production Functions
 opts['utility'] = utilityDefault
-opts['bequest'] = bequestValue
+opts['bequest'] = bequestValueDefault
 opts['production'] = productionDefault
+opts['statewage'] = statewageDefault
 opts['beta'] = 0.9
 
 # Mean wages over time
-opts['wages'] = wages
+# opts['wages'] = None
 
 # Number of periods
-opts['T'] = T
+opts['T'] = 1
 
 # Number states describing
 # change in wages
-opts['states'] = [0,1,2]
-opts['trans'] = mTrans
+# opts['states'] = [0,1,2]
+# opts['trans'] = mTrans
 
 ## Optimization Parameters
 
@@ -105,54 +78,108 @@ opts['init'] = 0.1
 opts['end'] = 10.
 
 ## Execute the solver
-r = execute(deg = 5, pts=100, opts=opts)[0]
-#r2 = execute(deg = 5, pts=40, opts=opts, preserveShape=True)
+result = execute(deg = opts['deg'], pts=opts['pts'], opts=opts)
+print "CASE ONE COMPLETE"
 
-# two periods with labor choice
-# analytic soln
+########################################
+# Case 2.
+# One period with elastic labor
+########################################
 
-grid = np.arange(0.1,10,0.01)
+# Add labor to utility function
+def utilityDefault(x, y):
+	k1, l = x
+	k0, w = y
 
-income = lambda k0: k0**0.33 + 0.9 * k0
-labor = lambda k0: (25. + 0.81*25. - income(k0)) / (5. + 25. + 25. * 0.81)
-c1 = lambda k0: 25. * (1. - labor(k0))
-c2 = lambda k0: 0.81 * c1(k0)
-u = lambda k0: c1(k0)**0.5 + 0.9 * c2(k0)**0.5 + (1.-labor(k0))**0.5
+	if l >= 1 or k0**0.33 + (0.9 * k0) - k1 + (w * l) < 0:
+		return -1
 
-grid = np.arange(0.1,10,0.01)
-# grid = nodes(0.1,10,40)
-# yactual = map(u, grid)
-# yapprox = map(lambda x: chebval(x, r[0][0], 0.1, 10), grid)
-yapprox1 = map(lambda x: chebval(x, r[0][1], 0.1, 10), grid)
-# yapprox2 = map(lambda x: chebval(x, r[0][2], 0.1, 10), grid)
+	return (k0**0.33 + (0.9 * k0) - k1 + (w * l))**0.5 + (1. - l)**0.5
 
-# yapproxs = map(lambda x: chebval(x, r2[0][0], 0.1, 10), grid)
-# yapprox1s = map(lambda x: chebval(x, r2[0][1], 0.1, 10), grid)
-# yapprox2s = map(lambda x: chebval(x, r2[0][2], 0.1, 10), grid)
+opts['wages'] = [5]
+opts['utility'] = utilityDefault
 
-# yapprox = r[0][1]
-# yapprox1 = r[30][1]
-# yapprox2 = r[59][1]
+## Execute the solver
+result = execute(deg = opts['deg'], pts=opts['pts'], opts=opts)
+print "CASE TWO COMPLETE"
 
-# yapproxs = r2[0][1]
-# yapprox1s = r2[30][1]
-# yapprox2s = r2[59][1]
+########################################
+# Case 3.
+# Ten periods with elastic labor
+# deterministic varying wages 
+########################################
 
-# print len(grid), len(yapprox1)
+## Define wages over time
+# Rise in first third, constant for second third,
+# and slowly declining in third third
+opts['T'] = 10
+wages = np.zeros(opts['T'])
+period = int(np.floor(opts['T']/3.))
+if period == 0:
+	print "Too few periods - setting constant wages"
+	wages[:] = 5
+else:
+	for i in xrange(period+1):
+		wages[i] = i * (5. / period)# growing up to 5
+	wages[period:2*period] = 5.
+	for i in xrange(2*period,opts['T']):
+		wages[i] = 5. - 2. * (i - 2.*period) / (opts['T'] - 2.*period)
+opts['wages'] = wages
 
-ppt.clf()
-ppt.plot(grid,yapprox1)
-ppt.axis([0,10,0,20])
-ppt.xlabel('k0')
-ppt.ylabel('v')
-ppt.savefig('myplot')
+## Execute the solver
+result = execute(deg = opts['deg'], pts=opts['pts'], opts=opts)
+print "CASE THREE COMPLETE"
 
-# ppt.plot(grid,yapprox)
-# ppt.plot(grid,yapprox2)
+########################################
+# Case 4.
+# Ten periods with elastic labor
+# and wages which move through
+# three states, high, mid, and low
+# in high state, wages 10% above mean
+# in low state wages 10% below mean
+# movement between states described by
+# transition matrix
+########################################
 
-# ppt.plot(grid,yapprox1s)
-# ppt.plot(grid,yapproxs)
-# ppt.plot(grid,yapprox2s)
+mTrans = np.zeros((3,3))
+mTrans[0,:] = [0.75,0.2,0.05]
+mTrans[1,:] = [0.25,.5,.25]
+mTrans[2,:] = [0.05,0.2,0.75]
 
-# # ppt.plot(grid,yactual,'k')
-# ppt.show()
+# wage state
+# computes the wage given the current state
+def statewageDefault(state, wage):
+	if state == 0:
+		return wage * 0.9
+	elif state == 1:
+		return wage * 1
+	elif state == 2:
+		return wage * 1.1
+
+opts['trans'] = mTrans
+opts['states'] = [0,1,2]
+opts['statewage'] = statewageDefault
+
+## Execute the solver
+result = execute(deg = opts['deg'], pts=opts['pts'], opts=opts)
+print "CASE FOUR COMPLETE"
+
+########################################
+# Case 5.
+# Case Four, with timeline extended to
+# 60 periods
+########################################
+
+opts['T'] = 60
+wages = np.zeros(opts['T'])
+period = int(np.floor(opts['T']/3.))
+for i in xrange(period+1):
+	wages[i] = i * (5. / period)# growing up to 5
+wages[period:2*period] = 5.
+for i in xrange(2*period,opts['T']):
+	wages[i] = 5. - 2. * (i - 2.*period) / (opts['T'] - 2.*period)
+opts['wages'] = wages
+
+## Execute the solver
+result = execute(deg = opts['deg'], pts=opts['pts'], opts=opts)
+print "CASE FIVE COMPLETE"

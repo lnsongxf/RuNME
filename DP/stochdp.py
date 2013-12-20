@@ -231,10 +231,17 @@ def approxChebshape(xi, vi, init, end, deg, shapeGrid=None):
 # vt is a list of chebyshev polynomials, s.t.
 # vt[i] approximates the ith state in next period
 
-def maxim(xi, vt, state=[0,0], opts=None):
+# Inputs: xi    - array of floats, grid of nodes
+#         vt    - array of floats, coefficients of polynomial
+#                 approximating the next period value function
+#         state - array of floats, additional state parameters
+#         opts  - options and parameters
+# Output: 
 
-	assert 'utility' in opts, "No Utility Function Specified"
-	assert 'production' in opts, "No Production Function Specified"
+def maxim(xi, vt, state, opts=None):
+
+	## Process options
+	# opts = checkOptions(opts)
 
 	wage = state[1]
 	state = state[0]
@@ -244,30 +251,19 @@ def maxim(xi, vt, state=[0,0], opts=None):
 	vi = np.zeros(n)     # value
 	ui = np.zeros((n,2)) # policy
 
-	# Transition matrix between states
-	opts['trans'] = opts['trans'] if 'trans' in opts else np.ones(1)
-
-	# Stochastic Wages States
-	# computes the wage given the current state
-	def statewage(state, wage):
-		if state == 0:
-			return wage * 0.9
-		elif state == 1:
-			return wage * 1
-		elif state == 2:
-			return wage * 1.1
-
+	# If the state affects the wage
 	wage = opts['statewage'](state, wage)
 	
 	## Define objective function
-
-	def obj(k1,k0):
+	# function of policy (first variable) and state
+	# (second variable)
+	def obj(policy,k0):
 		# compute current period
-		curr = opts['utility'](k1,[k0,wage])
+		curr = opts['utility'](policy,[k0,wage])
 
 		# call value function approximation for
 		# continuation value
-		cont = [chebval(k1[0],vt[s],opts['init'],opts['end']) for s in opts['states']]
+		cont = [chebval(policy[0],vt[s],opts['init'],opts['end']) for s in opts['states']]
 
 		# and then take the conditional mean of the value function
 		# at each state
@@ -343,11 +339,12 @@ def checkOptions(opts):
 
 	# Variables with default values if not supplied
 
-	opts['states'] = opts['states'] if 'states' in opts else [0]
+	opts['states'] = opts['states'] if 'states' in opts else np.array([[0],])
 	opts['wages'] = opts['wages'] if 'wages' in opts else np.zeros(opts['T'])
 	opts['trans'] = opts['trans'] if 'trans' in opts else np.ones(1)
 
-	assert np.array(opts['trans']).shape == (len(opts['states']), len(opts['states'])), "Transition matrix malformed."
+	assert (np.array(opts['trans']).shape == (len(opts['states']), len(opts['states'])) or
+		   np.array(opts['trans']).shape == (len(opts['states']), )), "Transition matrix malformed."
 	assert len(opts['wages']) == opts['T'], "Wages malformed"
 
 	return opts	
@@ -442,4 +439,4 @@ def execute(deg, pts, opts, preserveShape=False):
 
 	# Note: value here is a list of coefficients, 
 	# policy is a list of values at each grid pt
-	return (value, policy)
+	return {'value':value, 'policy':policy}
