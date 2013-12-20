@@ -24,22 +24,22 @@ import matplotlib.pyplot as ppt
 # we might let x[0] = k_{t+1} and x[1] = l
 #####
 
+def productionDefault(k0):
+	return k0 ** 0.5 + (1 - 0.1) * k0
+
 # x - controls
 # y - state variables
 def utilityDefault(x, y):
 	k1= x
 	k0, w = y
 
-	if k0**0.33 + (0.9 * k0) - k1< 0:
+	if productionDefault(k0) - k1< 0:
 		return -1
 
-	return (k0**0.33 + (0.9 * k0) - k1)**0.5
+	return (productionDefault(k0) - k1)**0.5
 
 def bequestValueDefault(x):
 	return x**0.5
-
-def productionDefault(k0, l):
-	return k0 ** 0.5 + (1 - 0.1) * k0
 
 def statewageDefault(state, wage):
 	return wage
@@ -56,7 +56,7 @@ opts['statewage'] = statewageDefault
 opts['beta'] = 0.9
 
 # bounds for variables
-opts['bounds'] = lambda s: ((0, opts['production'](s[0],0)),)
+opts['bounds'] = lambda s: ((0, opts['production'](s[0])),)
 opts['x0'] = lambda s: np.array(sum(opts['bounds'](s)[0]) / 2.)
 print len( opts['bounds']((0,0),) )
 print opts['x0']    ((0,0),)
@@ -68,8 +68,8 @@ opts['T'] = 1
 
 # Degree of Chebyshev Polynomial
 # and number of nodes
-opts['deg'] = 5.
-opts['pts'] = 40.
+opts['deg'] = 5
+opts['pts'] = 40
 
 # Range of points
 opts['init'] = 0.1
@@ -106,14 +106,10 @@ print "CASE ONE PART B COMPLETE"
 # One period with elastic labor
 ########################################
 
-def utilityDefault(x, y):
-	k1, l = x
-	k0, w = y
-
-	if l >= 1 or k0**0.33 + (0.9 * k0) - k1< 0:
-		return -1
-
-	return (k0**0.33 + (0.9 * k0) - k1 + (w * l))**0.5
+# Add labor to production function
+def productionDefault(k0, l):
+	return k0 ** 0.5 + (1 - 0.1) * k0 
+opts['production'] = productionDefault
 
 # New bounds including labor as control
 kbounds = lambda s: (0, opts['production'](s[0],0) + s[1])
@@ -126,10 +122,10 @@ def utilityDefault(x, y):
 	k1, l = x
 	k0, w = y
 
-	if l >= 1 or k0**0.33 + (0.9 * k0) - k1 + (w * l) < 0:
+	if l >= 1 or productionDefault(k0,l) - k1 < 0:
 		return -1
 
-	return (k0**0.33 + (0.9 * k0) - k1 + (w * l))**0.5 + (1. - l)**0.5
+	return (productionDefault(k0,l) - k1)**0.5 + (1. - l)**0.5
 
 opts['wages'] = [5]
 opts['utility'] = utilityDefault

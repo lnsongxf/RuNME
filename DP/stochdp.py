@@ -74,7 +74,7 @@ def chebval(x, c, init, end):
 # Output: float, c evaluated at point x 
 
 def plotpoly(grid, poly, init, end):
-	vi = map(lambda x: chebval(x, poly, init, end), grid)
+	vi = [chebval(x, poly, init, end) for x in grid]
 	ppt.clf()
 	ppt.plot(grid,vi)
 	ppt.show()
@@ -249,7 +249,7 @@ def maxim(xi, vt, state, opts=None):
 	# Initialize arrays
 	n = len(xi)          # num grid points
 	vi = np.zeros(n)     # value
-	
+
 	nControls = len(opts['bounds']((0,0)))
 	ui = np.zeros((n,nControls)) # policy
 
@@ -361,7 +361,7 @@ def checkOptions(opts):
 #         policy[i][j] is an array describing the optimal policy in the jth state
 #                      in time period i
 
-def execute(deg, pts, opts, preserveShape=False):
+def execute(deg, pts, opts, preserveShape=True):
 
 	########################
 	## I. Processing options
