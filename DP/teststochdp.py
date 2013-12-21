@@ -97,6 +97,9 @@ def utilityDefault(x, y):
 def bequestValueDefault(x):
 	return np.log(x)
 
+opts['utility'] = utilityDefault
+opts['bequestValue'] = bequestValueDefault
+
 ## Execute the solver
 result = execute(deg = opts['deg'], pts=opts['pts'], opts=opts)
 print "CASE ONE PART B COMPLETE"
@@ -127,8 +130,12 @@ def utilityDefault(x, y):
 
 	return (productionDefault(k0,l) - k1)**0.5 + (1. - l)**0.5
 
+def bequestValueDefault(x):
+	return x**0.5
+
 opts['wages'] = [5]
 opts['utility'] = utilityDefault
+opts['bequest'] = bequestValueDefault
 
 ## Execute the solver
 result = execute(deg = opts['deg'], pts=opts['pts'], opts=opts)

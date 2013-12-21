@@ -323,7 +323,6 @@ def checkOptions(opts):
 
 	assert 'utility' in opts, "No Utility Function Specified"
 	assert 'bequest' in opts, "No Value for Final Period Specified"
-	assert 'production' in opts, "No Production Function Specified"
 	assert 'statewage' in opts, "No Function describing effect of state of wage Specified"
 
 	assert 'beta' in opts, "No beta value Specified"
@@ -431,8 +430,9 @@ def execute(deg, pts, opts, preserveShape=True):
 	# so that rec[i] = value function for period i
 	# and rec[T] = function for bequeath motive
 	value.reverse()
-	policy.reverse()
+	#policy.reverse()
 
 	# Note: value here is a list of coefficients, 
 	# policy is a list of values at each grid pt
-	return {'value':value, 'policy':policy}
+	return value
+	#return {'value':value, 'policy':policy}
