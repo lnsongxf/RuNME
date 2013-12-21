@@ -25,7 +25,7 @@ import matplotlib.pyplot as ppt
 #####
 
 def productionDefault(k0):
-	return k0 ** 0.5 + (1 - 0.1) * k0
+	return k0 ** (1./3.) + (1 - 0.1) * k0
 
 # x - controls
 # y - state variables
@@ -111,7 +111,7 @@ print "CASE ONE PART B COMPLETE"
 
 # Add labor to production function
 def productionDefault(k0, l):
-	return k0 ** 0.5 + (1 - 0.1) * k0 
+	return k0 ** (1./3.) + (1 - 0.1) * k0 
 opts['production'] = productionDefault
 
 # New bounds including labor as control
