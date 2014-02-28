@@ -2,7 +2,7 @@
 
 from stochdp import *
 import numpy as np
-import matplotlib.pyplot as ppt
+#import matplotlib.pyplot as ppt
 
 ## Sample runs of functions provided in
 ## module stochdp.py
@@ -76,8 +76,11 @@ opts['init'] = 0.1
 opts['end'] = 10.
 
 ## Execute the solver
-result = execute(deg = opts['deg'], pts=opts['pts'], opts=opts)
-print "CASE ONE COMPLETE"
+try:
+	result = execute(deg = opts['deg'], pts=opts['pts'], opts=opts)
+	print "CASE ONE COMPLETE"
+except:
+	print "CASE ONE FAILED"
 
 ########################################
 # Case 1b.
@@ -101,8 +104,11 @@ opts['utility'] = utilityDefault
 opts['bequestValue'] = bequestValueDefault
 
 ## Execute the solver
-result = execute(deg = opts['deg'], pts=opts['pts'], opts=opts)
-print "CASE ONE PART B COMPLETE"
+try:
+	result = execute(deg = opts['deg'], pts=opts['pts'], opts=opts)
+	print "CASE ONE PART B COMPLETE"
+except:
+	print "CASE ONE PART B FAILED"
 
 ########################################
 # Case 2.
@@ -138,8 +144,11 @@ opts['utility'] = utilityDefault
 opts['bequest'] = bequestValueDefault
 
 ## Execute the solver
-result = execute(deg = opts['deg'], pts=opts['pts'], opts=opts)
-print "CASE TWO COMPLETE"
+try:
+	result = execute(deg = opts['deg'], pts=opts['pts'], opts=opts)
+	print "CASE TWO COMPLETE"
+except:
+	print "CASE TWO FAILED"
 
 ########################################
 # Case 3.
@@ -161,8 +170,11 @@ for i in xrange(2*period,opts['T']):
 opts['wages'] = wages
 
 ## Execute the solver
-result = execute(deg = opts['deg'], pts=opts['pts'], opts=opts)
-print "CASE THREE COMPLETE"
+try:
+	result = execute(deg = opts['deg'], pts=opts['pts'], opts=opts)
+	print "CASE THREE COMPLETE"
+except:
+	print "CASE THREE FAILED"
 
 ########################################
 # Case 4.
@@ -195,8 +207,11 @@ opts['states'] = [0,1,2]
 opts['statewage'] = statewageDefault
 
 ## Execute the solver
-result = execute(deg = opts['deg'], pts=opts['pts'], opts=opts)
-print "CASE FOUR COMPLETE"
+try:
+	result = execute(deg = opts['deg'], pts=opts['pts'], opts=opts)
+	print "CASE FOUR COMPLETE"
+except:
+	print "CASE FOUR FAILED"
 
 ########################################
 # Case 5.
@@ -215,5 +230,8 @@ for i in xrange(2*period,opts['T']):
 opts['wages'] = wages
 
 ## Execute the solver
-result = execute(deg = opts['deg'], pts=opts['pts'], opts=opts)
-print "CASE FIVE COMPLETE"
+try:
+	result = execute(deg = opts['deg'], pts=opts['pts'], opts=opts)
+	print "CASE FIVE COMPLETE"
+except:
+	print "CASE FIVE FAILED"

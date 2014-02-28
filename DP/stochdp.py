@@ -22,7 +22,12 @@ from scipy import optimize
 import sys
 
 ## matplotlib.pyplot - Plotting and Images
-import matplotlib.pyplot as ppt
+## (Optional)
+PPT = True
+try:
+    import matplotlib.pyplot as ppt
+except:
+    PPT = False
 
 ##############################################################
 ## Convenient functions for working with Chebyshev polynomials
@@ -73,11 +78,12 @@ def chebval(x, c, init, end):
 #         end  - float, end of range
 # Output: float, c evaluated at point x 
 
-def plotpoly(grid, poly, init, end):
-	vi = [chebval(x, poly, init, end) for x in grid]
-	ppt.clf()
-	ppt.plot(grid,vi)
-	ppt.show()
+if PPT:
+        def plotpoly(grid, poly, init, end):
+	        vi = [chebval(x, poly, init, end) for x in grid]
+                ppt.clf()
+                ppt.plot(grid,vi)
+                ppt.show()
 
 ##############################################################
 
