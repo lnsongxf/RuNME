@@ -104,7 +104,7 @@ if case1:
 		print traceback.format_exc()
 
 
-## Check policy function
+## Check policy function (from pen & paper calc)
 
 # policy = k_1 = bequest
 #policy = result['policy'][0][0]
@@ -120,24 +120,11 @@ grid = nodes(opts['init'], opts['end'], opts['pts'])
 
 #b2y = 1. + (1. / 0.81)
 
-#print y
-#print b2y * policy
-
 #error = [y[i] - (b2y * policy)[i] for i in range(len(y))]
-
 #error =  np.array([error[i][0] for i in range(len(error))])
-
 #error = np.sum((error * error)**0.5)
 
 #print error
-
-## Check value function
-
-#value = result['value']
-#val = chebval(5, value[0][0], 0.1, 10)
-
-v0 = result['value'][0][0]
-v1 = result['value'][1][0]
 
 ########################################
 # Case 1b.
@@ -169,13 +156,7 @@ if case1b:
 		print "CASE ONE PART B FAILED"
 		print traceback.format_exc()
 
-v0 = result['value'][0][0]
-v1 = result['value'][1][0]
-
-#sys.exit()
-
-
-## Check policy function
+## Check policy function (from pen & paper calc)
 
 # policy = k_1 = bequest
 policy = result['policy'][0][0]
@@ -190,26 +171,13 @@ y = grid**(1./3.) + (0.9)*grid
 # compute multiple
 
 b2y = 1. + (1. / 0.9)
-#print b2y
-#print 'y',y
-#print 'yhat',b2y * policy
 
 error = [y[i] - (b2y * policy)[i] for i in range(len(y))]
-
 error =  np.array([error[i][0] for i in range(len(error))])
-
-#print error
 
 error = np.sum((error * error)**0.5)
 
 #print "Error:", error
-
-## Check value function
-
-value = result['value']
-val = chebval(5, value[0][0], 0.1, 10)
-
-#sys.exit()
 
 ########################################
 # Case 2.
@@ -222,7 +190,7 @@ def productionDefault(k0):
 opts['production'] = productionDefault
 
 # New bounds including labor as control
-kbounds = lambda s: (0, opts['production'](s[0]) + 1)
+kbounds = lambda s: (0, opts['production'](s[0]) + s[1])
 lbounds = lambda s: (0,1)
 opts['bounds'] = lambda s: (kbounds(s), lbounds(s))
 opts['x0'] = lambda s: np.array([sum(kbounds(s)) / 2.,sum(lbounds(s)) / 2.])
@@ -232,15 +200,13 @@ def utilityDefault(x, y):
 	k1, l = x
 	k0, w = y
 
-	print "wages=",w
-
-	if l >= 1 or productionDefault(k0) - k1 < 0:
+	if l >= 1 or productionDefault(k0) + w * l - k1 < 0:
 		return -1
 
-	return (productionDefault(k0) + w * l - k1)**0.5 + (1. - l)**0.5
+	return np.log(productionDefault(k0) + w * l - k1) + np.log(1. - l)
 
 def bequestValueDefault(x):
-	return x**0.5
+	return np.log(x)
 
 opts['wages'] = [5]
 opts['utility'] = utilityDefault
@@ -255,6 +221,15 @@ if case2:
 		print "CASE TWO FAILED"
 		print traceback.format_exc()
 
+# Check policy function (from pen & paper calc)
+k1 = result['policy'][0][0][:,0]
+l = result['policy'][0][0][:,1]
+
+k0 = grid
+
+e1 = 5*(1 - l) - (k0**.5 + .9 * k0 + 5*l - k1)
+e2 = (10./9.) * k1 - (k0**.5 + .9 * k0 + 5*l - k1)
+
 ########################################
 # Case 3.
 # Ten periods with elastic labor
@@ -268,14 +243,11 @@ opts['T'] = 10
 wages = np.zeros(opts['T'])
 period = int(np.floor(opts['T']/3.))
 for i in xrange(period+1):
-	wages[i] = i * (5. / period)# growing up to 5
-wages[period:2*period] = 5.
+	wages[i] = 1 + i * (5. / period)# growing up to 5
+wages[period:2*period] = 6.
 for i in xrange(2*period,opts['T']):
-	wages[i] = 5. - 2. * (i - 2.*period) / (opts['T'] - 2.*period)
+	wages[i] = 1 + 5. - 2. * (i - 2.*period) / (opts['T'] - 2.*period)
 opts['wages'] = wages
-
-## Constant wages
-opts['wages'] = np.array([0,1,0,1,0,1,0,1,0,1])
 
 ## Execute the solver
 if case3:

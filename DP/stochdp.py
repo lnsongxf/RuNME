@@ -441,7 +441,7 @@ def execute(deg, pts, opts, preserveShape=True):
 	# so that rec[i] = value function for period i
 	# and rec[T] = function for bequeath motive
 	value.reverse()
-	#policy.reverse()
+	policy.reverse()
 
 	# Note: value here is a list of coefficients, 
 	# policy is a list of values at each grid pt
