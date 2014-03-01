@@ -276,7 +276,10 @@ def maxim(xi, vt, state, opts=None):
 
 		# and then take the conditional mean of the value function
 		# at each state
-		cont = opts['trans'][state,:].dot(cont)
+                if len(cont) == 1:
+                    cont = cont[0]
+                else:
+                    cont = opts['trans'][state,:].dot(cont)
 
 		return -(curr + opts['beta'] * cont)
 
@@ -405,6 +408,8 @@ def execute(deg, pts, opts, preserveShape=True):
 	# Initialize final time period value function
 	bequest = [opts['bequest'](x) for x in grid]
 
+        print opts['bequest'](5)
+
 	# approximate function with polynomial
 	poly = [approxshape(grid, bequest, opts['init'], opts['end'], deg) for state in opts['states']]
 	value.append(poly)
@@ -440,5 +445,5 @@ def execute(deg, pts, opts, preserveShape=True):
 
 	# Note: value here is a list of coefficients, 
 	# policy is a list of values at each grid pt
-	return value
-	#return {'value':value, 'policy':policy}
+	#return value
+	return {'value':value, 'policy':policy}

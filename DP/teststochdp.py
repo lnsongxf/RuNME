@@ -3,9 +3,30 @@
 from stochdp import *
 import numpy as np
 #import matplotlib.pyplot as ppt
+import traceback
 
 ## Sample runs of functions provided in
 ## module stochdp.py
+
+##############################################
+# Setup
+##############################################
+
+# Check Numpy Version
+try:
+	assert(np.version.version == '1.8.0')
+except:
+	print "WARNING: NUMPY VERSION != 1.8.0"
+
+# Set active cases
+case1 = True
+case1b = True
+case2 = True
+case3 = True
+case4 = False
+case5 = False
+
+##############################################
 
 ##############################################
 # Case 1.
@@ -58,8 +79,6 @@ opts['beta'] = 0.9
 # bounds for variables
 opts['bounds'] = lambda s: ((0, opts['production'](s[0])),)
 opts['x0'] = lambda s: np.array(sum(opts['bounds'](s)[0]) / 2.)
-print len( opts['bounds']((0,0),) )
-print opts['x0']    ((0,0),)
 
 # Number of periods
 opts['T'] = 1
@@ -68,19 +87,57 @@ opts['T'] = 1
 
 # Degree of Chebyshev Polynomial
 # and number of nodes
-opts['deg'] = 5
-opts['pts'] = 40
+opts['deg'] = 10
+opts['pts'] = 11
 
 # Range of points
 opts['init'] = 0.1
 opts['end'] = 10.
 
 ## Execute the solver
-try:
-	result = execute(deg = opts['deg'], pts=opts['pts'], opts=opts)
-	print "CASE ONE COMPLETE"
-except:
-	print "CASE ONE FAILED"
+if case1:
+	try:
+		result = execute(deg = opts['deg'], pts=opts['pts'], opts=opts)
+		print "CASE ONE COMPLETE"
+	except:
+		print "CASE ONE FAILED"
+		print traceback.format_exc()
+
+
+## Check policy function
+
+# policy = k_1 = bequest
+#policy = result['policy'][0][0]
+
+# grid = k0
+grid = nodes(opts['init'], opts['end'], opts['pts'])
+
+# compute Y
+
+#y = grid**(1./3.) + (0.9)*grid
+
+# compute multiple
+
+#b2y = 1. + (1. / 0.81)
+
+#print y
+#print b2y * policy
+
+#error = [y[i] - (b2y * policy)[i] for i in range(len(y))]
+
+#error =  np.array([error[i][0] for i in range(len(error))])
+
+#error = np.sum((error * error)**0.5)
+
+#print error
+
+## Check value function
+
+#value = result['value']
+#val = chebval(5, value[0][0], 0.1, 10)
+
+v0 = result['value'][0][0]
+v1 = result['value'][1][0]
 
 ########################################
 # Case 1b.
@@ -88,27 +145,71 @@ except:
 # modified utility function
 ########################################
 
-def utilityDefault(x, y):
+def utilityLog(x, y):
 	k1= x
 	k0, w = y
 
-	if k0**0.33 + (0.9 * k0) - k1< 0:
+	if k0**0.33 + (0.9 * k0) - k1 < 0:
 		return -1
 
 	return np.log(k0**0.33 + (0.9 * k0) - k1)
 
-def bequestValueDefault(x):
+def bequestValueLog(x):
 	return np.log(x)
 
-opts['utility'] = utilityDefault
-opts['bequestValue'] = bequestValueDefault
+opts['utility'] = utilityLog
+opts['bequest'] = bequestValueLog
 
-## Execute the solver
-try:
-	result = execute(deg = opts['deg'], pts=opts['pts'], opts=opts)
-	print "CASE ONE PART B COMPLETE"
-except:
-	print "CASE ONE PART B FAILED"
+# Execute the solver
+if case1b:
+	try:
+		result = execute(deg = opts['deg'], pts=opts['pts'], opts=opts)
+		print "CASE ONE PART B COMPLETE"
+	except:
+		print "CASE ONE PART B FAILED"
+		print traceback.format_exc()
+
+v0 = result['value'][0][0]
+v1 = result['value'][1][0]
+
+#sys.exit()
+
+
+## Check policy function
+
+# policy = k_1 = bequest
+policy = result['policy'][0][0]
+
+# grid = k0
+grid = nodes(opts['init'], opts['end'], opts['pts'])
+
+# compute Y
+
+y = grid**(1./3.) + (0.9)*grid
+
+# compute multiple
+
+b2y = 1. + (1. / 0.9)
+#print b2y
+#print 'y',y
+#print 'yhat',b2y * policy
+
+error = [y[i] - (b2y * policy)[i] for i in range(len(y))]
+
+error =  np.array([error[i][0] for i in range(len(error))])
+
+#print error
+
+error = np.sum((error * error)**0.5)
+
+#print "Error:", error
+
+## Check value function
+
+value = result['value']
+val = chebval(5, value[0][0], 0.1, 10)
+
+#sys.exit()
 
 ########################################
 # Case 2.
@@ -116,12 +217,12 @@ except:
 ########################################
 
 # Add labor to production function
-def productionDefault(k0, l):
-	return k0 ** (1./3.) + (1 - 0.1) * k0 
+def productionDefault(k0):
+	return (k0 ** .5) + 0.9 * k0
 opts['production'] = productionDefault
 
 # New bounds including labor as control
-kbounds = lambda s: (0, opts['production'](s[0],0) + s[1])
+kbounds = lambda s: (0, opts['production'](s[0]) + 1)
 lbounds = lambda s: (0,1)
 opts['bounds'] = lambda s: (kbounds(s), lbounds(s))
 opts['x0'] = lambda s: np.array([sum(kbounds(s)) / 2.,sum(lbounds(s)) / 2.])
@@ -131,10 +232,12 @@ def utilityDefault(x, y):
 	k1, l = x
 	k0, w = y
 
-	if l >= 1 or productionDefault(k0,l) - k1 < 0:
+	print "wages=",w
+
+	if l >= 1 or productionDefault(k0) - k1 < 0:
 		return -1
 
-	return (productionDefault(k0,l) - k1)**0.5 + (1. - l)**0.5
+	return (productionDefault(k0) + w * l - k1)**0.5 + (1. - l)**0.5
 
 def bequestValueDefault(x):
 	return x**0.5
@@ -144,11 +247,13 @@ opts['utility'] = utilityDefault
 opts['bequest'] = bequestValueDefault
 
 ## Execute the solver
-try:
-	result = execute(deg = opts['deg'], pts=opts['pts'], opts=opts)
-	print "CASE TWO COMPLETE"
-except:
-	print "CASE TWO FAILED"
+if case2:
+	try:
+		result = execute(deg = opts['deg'], pts=opts['pts'], opts=opts)
+		print "CASE TWO COMPLETE"
+	except:
+		print "CASE TWO FAILED"
+		print traceback.format_exc()
 
 ########################################
 # Case 3.
@@ -169,12 +274,17 @@ for i in xrange(2*period,opts['T']):
 	wages[i] = 5. - 2. * (i - 2.*period) / (opts['T'] - 2.*period)
 opts['wages'] = wages
 
+## Constant wages
+opts['wages'] = np.array([0,1,0,1,0,1,0,1,0,1])
+
 ## Execute the solver
-try:
-	result = execute(deg = opts['deg'], pts=opts['pts'], opts=opts)
-	print "CASE THREE COMPLETE"
-except:
-	print "CASE THREE FAILED"
+if case3:
+	try:
+		result = execute(deg = opts['deg'], pts=opts['pts'], opts=opts)
+		print "CASE THREE COMPLETE"
+	except:
+		print "CASE THREE FAILED"
+		print traceback.format_exc()
 
 ########################################
 # Case 4.
@@ -207,11 +317,13 @@ opts['states'] = [0,1,2]
 opts['statewage'] = statewageDefault
 
 ## Execute the solver
-try:
-	result = execute(deg = opts['deg'], pts=opts['pts'], opts=opts)
-	print "CASE FOUR COMPLETE"
-except:
-	print "CASE FOUR FAILED"
+if case4:
+	try:
+		result = execute(deg = opts['deg'], pts=opts['pts'], opts=opts)
+		print "CASE FOUR COMPLETE"
+	except:
+		print "CASE FOUR FAILED"
+		print traceback.format_exc()
 
 ########################################
 # Case 5.
@@ -230,8 +342,10 @@ for i in xrange(2*period,opts['T']):
 opts['wages'] = wages
 
 ## Execute the solver
-try:
-	result = execute(deg = opts['deg'], pts=opts['pts'], opts=opts)
-	print "CASE FIVE COMPLETE"
-except:
-	print "CASE FIVE FAILED"
+if case5:
+	try:
+		result = execute(deg = opts['deg'], pts=opts['pts'], opts=opts)
+		print "CASE FIVE COMPLETE"
+	except:
+		print "CASE FIVE FAILED"
+		print traceback.format_exc()
