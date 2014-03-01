@@ -86,14 +86,14 @@ def utilityDefault(x, y):
     k1, l = x
     k0, w = y
 
-    if l >= 1 or productionDefault(k0,l) - k1 < 0:
+    if l >= 1 or productionDefault(k0,l) + w * l - k1 < 0:
         return -1
 
-    return (productionDefault(k0,l) - k1)**0.5 + (1. - l)**0.5
+    return (productionDefault(k0,l) + w * l - k1)**0.5 + (1. - l)**0.5
 	
 opts['utility'] = utilityDefault
 \end{verbatim}
-\paragraph{} This encodes a utility function of the form $u(c_t) = c_t^{\frac{1}{2}} + (1 - l)^{\frac{1}{2}}$, with production following $f(k_0) = k_0^{\frac{1}{3}}$ and depreciation of $10\%$.
+\paragraph{} This encodes a utility function of the form $u(c_t) = c_t^{\frac{1}{2}} + (1 - l)^{\frac{1}{2}}$, where $c_t = k_0^{\frac{1}{3}} + (0.9)*k_0 + w * l$.
 \begin{verbatim}
 def bequestValueDefault(x):
     return x**0.5
